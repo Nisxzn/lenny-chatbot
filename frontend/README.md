@@ -10,7 +10,7 @@ The frontend is a modern, responsive single-page application built with **React 
   - **Left Sidebar:** Conversation thread management (create, rename, delete, switch).
   - **Center Chat:** Full markdown chat stream with live SSE token deltas and auto-scroll.
   - **Right Artifact Viewer:** Dedicated side pane rendering generated essays, briefs, and HTML mockups.
-- **Server-Sent Events (SSE) Streaming:** Real-time token streaming with live status updates (*"Thinking..."*, *"Generating your answer..."*, *"Drafting your artifact..."*).
+- **Server-Sent Events (SSE) Streaming:** Real-time token streaming with live status updates (_"Thinking..."_, _"Generating your answer..."_, _"Drafting your artifact..."_).
 - **Interactive Source Citations:** Clickable source badges displaying episode name and speaker, opening an overlay drawer with timestamps, official links, and retrieved excerpts.
 - **Dynamic Model Selector:** Fast switching between **Local (Qwen3)** (`qwen3:4b`), **Local (Llama 3)** (`llama3:latest`), and **Cloud (OpenRouter)** (`openai/gpt-4o-mini`).
 - **Safe HTML & Markdown Isolation:** Untrusted HTML artifacts render strictly inside an iframe with `sandbox=""` and `referrerPolicy="no-referrer"`. Markdown is parsed without raw HTML injection.
@@ -32,25 +32,32 @@ The frontend is a modern, responsive single-page application built with **React 
 ## 🚀 Setup & Installation (Windows PowerShell / Bash)
 
 ### 1. Install Dependencies
+
 ```bash
 cd frontend
 npm install
 ```
 
 ### 2. Configure Environment Variables
+
 Copy `.env.example` to `.env.local`:
+
 ```bash
 cp .env.example .env.local
 ```
+
 Ensure `VITE_API_BASE_URL` points to your backend instance:
+
 ```env
 VITE_API_BASE_URL=http://localhost:8000/api/v1
 ```
 
 ### 3. Run Development Server
+
 ```bash
 npm run dev
 ```
+
 The application will launch at `http://localhost:5173` (or port configured by Vite).
 
 ---
@@ -58,26 +65,32 @@ The application will launch at `http://localhost:5173` (or port configured by Vi
 ## 🧪 Testing & Code Quality
 
 ### Run Unit & Integration Tests (Vitest)
+
 ```bash
 npm test
 ```
+
 **Test Results:**
+
 - **3 test suites passed (13 tests total)**:
   - `src/test/chat-flow.test.ts`: Chat sending, streaming chunks, and message state.
   - `src/test/conversations.test.ts`: Thread creation, selection, and deletion.
   - `src/test/app-routing.test.tsx`: Route mounting and initial state hydration.
 
 ### Check Linting & Formatting
+
 ```bash
 npm run lint
 ```
 
 ### Auto-Format Codebase
+
 ```bash
 npm run format
 ```
 
 ### Build Production Bundle
+
 ```bash
 npm run build
 ```

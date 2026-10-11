@@ -45,25 +45,28 @@ export function ArtifactViewer({ className }: { className?: string }) {
     URL.revokeObjectURL(a.href);
   };
 
-  const iconBtn = "size-8 shrink-0 text-muted-foreground hover:text-foreground";
+  const iconBtn =
+    "size-7 shrink-0 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors rounded-md";
 
   return (
     <section
       aria-label="Artifact viewer"
       className={cn("flex min-h-0 min-w-0 flex-col bg-sidebar", className)}
     >
-      <header className="grid h-[72px] shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-border/60 px-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-brand-subtle text-primary">
+      <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted/60 text-foreground">
             {artifact.type === "html" ? (
-              <Code2 className="size-4" />
+              <Code2 className="size-3.5" />
             ) : (
-              <FileText className="size-4" />
+              <FileText className="size-3.5" />
             )}
           </span>
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium">{artifact.title}</p>
-            <p className="mt-1 text-[11px] text-muted-foreground">
+            <p className="truncate text-[15.5px] sm:text-base font-medium tracking-tight text-foreground">
+              {artifact.title}
+            </p>
+            <p className="font-mono text-[11px] text-muted-foreground">
               {artifact.type === "html" ? "HTML / CSS" : "Markdown"}
             </p>
           </div>
@@ -76,15 +79,15 @@ export function ArtifactViewer({ className }: { className?: string }) {
           title="Close artifact viewer"
           className={iconBtn}
         >
-          <X />
+          <X className="size-4" />
         </Button>
       </header>
 
       {/* Multiple artifacts selector tab bar if conversation has multiple artifacts */}
       {artifacts.length > 1 && (
-        <div className="flex items-center gap-2 overflow-x-auto border-b border-border/60 px-4 py-2 text-xs">
-          <span className="flex shrink-0 items-center gap-1 text-[11px] font-medium text-muted-foreground">
-            <Layers className="size-3" /> Artifacts ({artifacts.length}):
+        <div className="flex items-center gap-2 overflow-x-auto border-b border-border bg-sidebar/80 px-4 py-1.5 text-xs scrollbar-thin">
+          <span className="flex shrink-0 items-center gap-1 font-mono text-[11px] text-muted-foreground">
+            <Layers className="size-3.5" /> Artifacts ({artifacts.length}):
           </span>
           <div className="flex gap-1">
             {artifacts.map((a) => (
@@ -94,10 +97,10 @@ export function ArtifactViewer({ className }: { className?: string }) {
                 size="sm"
                 onClick={() => openArtifact(a)}
                 className={cn(
-                  "h-6 max-w-[150px] truncate px-2 text-[11px]",
+                  "h-6.5 max-w-[160px] truncate px-2.5 text-xs transition-colors rounded",
                   a.id === artifact.id
-                    ? "bg-accent text-foreground font-medium"
-                    : "text-muted-foreground",
+                    ? "border border-border/70 bg-accent text-foreground font-medium"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
                 title={a.title}
               >
@@ -108,11 +111,11 @@ export function ArtifactViewer({ className }: { className?: string }) {
         </div>
       )}
 
-      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-4 py-2">
         <div
           role="tablist"
           aria-label="Artifact view"
-          className="flex gap-1 rounded-lg border border-border/60 bg-background/50 p-1"
+          className="flex gap-0.5 rounded-md border border-border/60 bg-background/60 p-0.5"
         >
           {(["preview", "source"] as const).map((t) => (
             <Button
@@ -124,11 +127,13 @@ export function ArtifactViewer({ className }: { className?: string }) {
               aria-controls="artifact-content"
               onClick={() => setTab(t)}
               className={cn(
-                "h-7 gap-1.5 px-3 text-xs capitalize",
-                tab === t ? "bg-accent text-foreground" : "text-muted-foreground",
+                "h-7 gap-1.5 px-3 text-[12.5px] capitalize transition-colors rounded",
+                tab === t
+                  ? "bg-accent text-foreground font-medium shadow-2xs"
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
-              {t === "preview" ? <Eye /> : <Code2 />}
+              {t === "preview" ? <Eye className="size-3.5" /> : <Code2 className="size-3.5" />}
               {t}
             </Button>
           ))}
@@ -142,7 +147,11 @@ export function ArtifactViewer({ className }: { className?: string }) {
             title="Copy artifact"
             className={iconBtn}
           >
-            {copied ? <Check className="text-primary" /> : <Copy />}
+            {copied ? (
+              <Check className="size-3.5 text-foreground" />
+            ) : (
+              <Copy className="size-3.5" />
+            )}
           </Button>
           <Button
             variant="ghost"
@@ -152,21 +161,21 @@ export function ArtifactViewer({ className }: { className?: string }) {
             title="Download artifact"
             className={iconBtn}
           >
-            <Download />
+            <Download className="size-3.5" />
           </Button>
         </div>
       </div>
       <div
         id="artifact-content"
         role="tabpanel"
-        className="min-h-0 flex-1 overflow-auto overscroll-contain p-4 sm:p-5"
+        className="min-h-0 flex-1 overflow-auto overscroll-contain p-4 sm:p-5 scrollbar-thin"
       >
         {!artifact.content ? (
           <EmptyState icon={<FileText className="size-6" />} title="No content">
             This artifact does not contain any content.
           </EmptyState>
         ) : tab === "source" ? (
-          <pre className="whitespace-pre-wrap break-words rounded-lg border border-border/70 bg-background p-4 font-mono text-xs leading-relaxed text-foreground">
+          <pre className="whitespace-pre-wrap break-words rounded-lg border border-border bg-card p-4 font-mono text-xs leading-relaxed text-foreground/90">
             <code>{artifact.content}</code>
           </pre>
         ) : artifact.type === "html" ? (

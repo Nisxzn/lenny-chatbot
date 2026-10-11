@@ -50,6 +50,7 @@ export interface SendMessageResult {
   artifact?: Artifact | undefined;
   id?: string;
   conversationId?: string;
+  conversationTitle?: string;
 }
 
 export interface AssistantApi {
@@ -65,6 +66,7 @@ export interface AssistantApi {
   }): Promise<SendMessageResult>;
   listConversations(): Promise<FrontendConversation[]>;
   createConversation(title?: string): Promise<FrontendConversation>;
+  renameConversation(conversationId: string, title: string): Promise<FrontendConversation>;
   deleteConversation(conversationId: string): Promise<void>;
   getMessages(conversationId: string): Promise<Message[]>;
   getArtifacts(conversationId: string): Promise<Artifact[]>;
@@ -138,28 +140,70 @@ export const api: AssistantApi = {
     };
   },
 
-  async deleteConversation(conversationId: string) {
-    await fetchWithValidation(`/conversations/${conversationId}`, {
-      method: "DELETE",
+  async renameConversation(conversationId: string, title: string) {
+    const data = await fetchWithValidation(`/conversations/${conversationId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ title }),
     });
+    return {
+      id: data.id,
+      title: data.title,
+      updatedAt: new Date(data.updated_at).getTime(),
+      messages: [],
+    };
+  },
+
+  async deleteConversation(conversationId: string) {
+    try {
+      await fetchWithValidation(`/conversations/${conversationId}`, {
+        method: "DELETE",
+      });
+    } catch (e: any) {
+      if (e?.status === 404) return;
+      throw e;
+    }
   },
 
   async getMessages(conversationId: string) {
-    const data = await fetchWithValidation(`/conversations/${conversationId}/messages`);
+    let data: BackendMessage[] = [];
+    try {
+      const res = await fetchWithValidation(`/conversations/${conversationId}/messages`);
+      if (Array.isArray(res)) data = res;
+    } catch (e: any) {
+      if (e?.status === 404) return [];
+      throw e;
+    }
     return data.map((m: BackendMessage) => {
       const art =
         m.artifact || (m.artifacts && m.artifacts.length > 0 ? m.artifacts[0] : undefined);
-      const sources: Source[] = (m.citations || []).map((c: BackendCitation, idx: number) => ({
-        id: `citation-${m.id}-${idx}`,
-        title: c.episode_title || "Lenny's Podcast",
-        guest: c.speaker || "Lenny Rachitsky",
-        speaker: c.speaker,
-        episode: c.episode_title || "Lenny's Podcast",
-        episode_title: c.episode_title,
-        timestamp: c.timestamp,
-        url: c.url,
-        content: c.content,
-      }));
+      const sources: Source[] = (m.citations || [])
+        .filter((c: BackendCitation) => {
+          if (!c) return false;
+          const title = (c.episode_title || "").trim();
+          const speaker = (c.speaker || "").trim();
+          const lower = `${title} ${speaker}`.toLowerCase();
+          if (
+            lower.includes("mock") ||
+            lower.includes("fictional") ||
+            title.toLowerCase() === "unknown" ||
+            title.toLowerCase() === "n/a"
+          ) {
+            return false;
+          }
+          return Boolean(title || c.url);
+        })
+        .map((c: BackendCitation, idx: number) => ({
+          id: `citation-${m.id}-${idx}`,
+          title: c.episode_title?.trim() || "",
+          guest: c.speaker?.trim() || "",
+          speaker: c.speaker,
+          episode: c.episode_title?.trim() || "",
+          episode_title: c.episode_title,
+          timestamp: c.timestamp,
+          url: c.url,
+          content: c.content,
+        }))
+        .filter((s: Source) => Boolean(s.title || s.url));
       return {
         id: m.id,
         role: m.role,
@@ -180,13 +224,19 @@ export const api: AssistantApi = {
   },
 
   async getArtifacts(conversationId: string) {
-    const data = await fetchWithValidation(`/conversations/${conversationId}/artifacts`);
-    return data.map((a: BackendArtifact) => ({
-      id: a.id,
-      title: a.title,
-      type: a.artifact_type,
-      content: a.content,
-    }));
+    try {
+      const data = await fetchWithValidation(`/conversations/${conversationId}/artifacts`);
+      if (!Array.isArray(data)) return [];
+      return data.map((a: BackendArtifact) => ({
+        id: a.id,
+        title: a.title,
+        type: a.artifact_type,
+        content: a.content,
+      }));
+    } catch (e: any) {
+      if (e?.status === 404) return [];
+      throw e;
+    }
   },
 
   async getArtifact(artifactId: string) {
@@ -233,19 +283,34 @@ export const api: AssistantApi = {
     // Fallback if the backend does not stream (e.g. content-type is json or body is absent)
     if (!response.body || response.headers?.get?.("content-type")?.includes("application/json")) {
       const responseData = await response.json();
-      const sources: Source[] = (responseData.citations || []).map(
-        (c: BackendCitation, index: number) => ({
+      const sources: Source[] = (responseData.citations || [])
+        .filter((c: BackendCitation) => {
+          if (!c) return false;
+          const title = (c.episode_title || "").trim();
+          const speaker = (c.speaker || "").trim();
+          const lower = `${title} ${speaker}`.toLowerCase();
+          if (
+            lower.includes("mock") ||
+            lower.includes("fictional") ||
+            title.toLowerCase() === "unknown" ||
+            title.toLowerCase() === "n/a"
+          ) {
+            return false;
+          }
+          return Boolean(title || c.url);
+        })
+        .map((c: BackendCitation, index: number) => ({
           id: `citation-${index}`,
-          title: c.episode_title || "Lenny's Podcast",
-          guest: c.speaker || "Lenny Rachitsky",
+          title: c.episode_title?.trim() || "",
+          guest: c.speaker?.trim() || "",
           speaker: c.speaker,
-          episode: c.episode_title || "Lenny's Podcast",
+          episode: c.episode_title?.trim() || "",
           episode_title: c.episode_title,
           timestamp: c.timestamp,
           url: c.url,
           content: c.content,
-        }),
-      );
+        }))
+        .filter((s: Source) => Boolean(s.title || s.url));
       let artifact: Artifact | undefined = undefined;
       if (responseData.artifacts && responseData.artifacts.length > 0) {
         const a = responseData.artifacts[0] as BackendArtifact;
@@ -266,6 +331,7 @@ export const api: AssistantApi = {
         artifact,
         id: responseData.assistant_message_id,
         conversationId: responseData.conversation_id,
+        conversationTitle: responseData.conversation_title,
       };
     }
 

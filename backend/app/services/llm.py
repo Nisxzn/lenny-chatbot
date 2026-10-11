@@ -29,6 +29,9 @@ class LLMProvider(ABC):
         """
         pass
 
+_TOOL_SUPPORT_CACHE: Dict[str, bool] = {}
+_INSTALLED_MODELS_CACHE: Optional[set] = None
+
 def check_native_tool_support(provider_type: str, model: str, base_url: str = "") -> bool:
     """
     Checks whether the target provider and model natively support function/tool calling.
@@ -38,10 +41,16 @@ def check_native_tool_support(provider_type: str, model: str, base_url: str = ""
         return True
         
     model_lower = (model or "").lower()
+    cache_key = f"{provider_type}:{model_lower}"
+    if cache_key in _TOOL_SUPPORT_CACHE:
+        return _TOOL_SUPPORT_CACHE[cache_key]
+
     # Base Llama 3 models in Ollama do not have tool calling templates in their Modelfile
     if model_lower == "llama3" or model_lower.startswith("llama3:") or "llama3:latest" in model_lower:
+        _TOOL_SUPPORT_CACHE[cache_key] = False
         return False
     if any(m in model_lower for m in ["llama3.1", "llama3.2", "llama3.3", "qwen2.5", "qwen3", "mistral"]):
+        _TOOL_SUPPORT_CACHE[cache_key] = True
         return True
 
     # Probe Ollama capabilities via /api/show if reachable
@@ -54,12 +63,13 @@ def check_native_tool_support(provider_type: str, model: str, base_url: str = ""
                 data = resp.json()
                 caps = data.get("capabilities", [])
                 template = data.get("template", "")
-                if "tools" in caps or "{{ .Tools }}" in template or "{{.Tools}}" in template:
-                    return True
-                return False
+                result = "tools" in caps or "{{ .Tools }}" in template or "{{.Tools}}" in template
+                _TOOL_SUPPORT_CACHE[cache_key] = result
+                return result
     except Exception:
         pass
 
+    _TOOL_SUPPORT_CACHE[cache_key] = False
     return False
 
 def is_writing_request(text: str) -> bool:
@@ -96,10 +106,88 @@ class OllamaCompatibleProvider(OpenAIProvider):
         if not self.supports_tools or not tools:
             payload.pop("tools", None)
             
-        # Optional optimization: limit context size for Ollama to reduce latency, unless overridden.
-        # Pass keep_alive via extra_body so OpenAI SDK completions.create accepts it without TypeError.
-        payload.setdefault("extra_body", {})["keep_alive"] = "1h"
+        # Performance optimizations for Ollama:
+        # 1. keep_alive="1h" prevents frequent model unloads
+        # 2. num_predict limits generation length for fast response times
+        # 3. num_ctx=2048 halves KV cache footprint for 2x faster prompt evaluation
+        # 4. temperature=0.6 reduces sampling latency
+        extra_body = payload.setdefault("extra_body", {})
+        extra_body["keep_alive"] = "1h"
+        extra_body["options"] = {
+            "num_predict": self.max_tokens or 768,
+            "num_ctx": 2048,
+            "temperature": 0.6,
+            "top_p": 0.9,
+        }
         return payload
+
+    @staticmethod
+    def _consume_stream(chunks: Any, on_delta: Any) -> Any:
+        from pi_agent.agent import AssistantResponse, Usage, ToolCall
+        from pi_agent.llm import _coerce_args
+        text_parts: List[str] = []
+        frags: Dict[int, Dict[str, str]] = {}
+        usage = Usage(0, 0)
+        stop_reason = ""
+        in_reasoning = False
+
+        for chunk in chunks:
+            cu = getattr(chunk, "usage", None)
+            if cu is not None:
+                usage = Usage(cu.prompt_tokens, cu.completion_tokens)
+            choices = getattr(chunk, "choices", None) or []
+            if not choices:
+                continue
+            choice = choices[0]
+            if getattr(choice, "finish_reason", None):
+                stop_reason = choice.finish_reason
+            delta = getattr(choice, "delta", None)
+            if delta is None:
+                continue
+
+            # Forward Ollama reasoning tokens if present
+            reasoning = getattr(delta, "reasoning", None) or getattr(delta, "reasoning_content", None)
+            if not reasoning and hasattr(delta, "model_extra") and delta.model_extra:
+                reasoning = delta.model_extra.get("reasoning") or delta.model_extra.get("reasoning_content")
+
+            if reasoning:
+                if not in_reasoning:
+                    in_reasoning = True
+                    on_delta("<think>")
+                on_delta(reasoning)
+            elif in_reasoning:
+                in_reasoning = False
+                on_delta("</think>")
+
+            content = getattr(delta, "content", None)
+            if content:
+                text_parts.append(content)
+                on_delta(content)
+
+            for tc in getattr(delta, "tool_calls", None) or []:
+                frag = frags.setdefault(getattr(tc, "index", 0), {"id": "", "name": "", "args": ""})
+                if getattr(tc, "id", None):
+                    frag["id"] = tc.id
+                fn = getattr(tc, "function", None)
+                if fn is not None:
+                    if getattr(fn, "name", None):
+                        frag["name"] = fn.name
+                    if getattr(fn, "arguments", None):
+                        frag["args"] += fn.arguments
+
+        if in_reasoning:
+            on_delta("</think>")
+
+        tool_calls = [
+            ToolCall(id=frags[i]["id"], name=frags[i]["name"], args=_coerce_args(frags[i]["args"]))
+            for i in sorted(frags)
+        ]
+        return AssistantResponse(
+            text="".join(text_parts),
+            tool_calls=tool_calls,
+            usage=usage,
+            stop_reason=stop_reason,
+        )
 
 class PiFrameworkProvider(LLMProvider):
     def __init__(self, provider_type: str, model: Optional[str] = None):
@@ -136,30 +224,33 @@ class PiFrameworkProvider(LLMProvider):
             else:
                 ollama_v1 = f"{ollama_base_url}/"
 
-            # Check if model is actually installed
-            try:
-                import httpx
-                tags_url = ollama_base_url.replace("/v1", "") + "/api/tags"
-                with httpx.Client(timeout=2.0) as client:
-                    resp = client.get(tags_url)
-                    if resp.status_code == 200:
-                        models = [m.get("name") for m in resp.json().get("models", [])]
-                        # Account for tags like :latest
-                        has_model = False
-                        for m in models:
-                            if m == self.model or m.startswith(self.model + ":") or self.model.startswith(m + ":"):
-                                has_model = True
-                                break
-                            # If self.model has no tag, check if m starts with it
-                            if ":" not in self.model and m.startswith(self.model + ":"):
-                                has_model = True
-                                break
-                        if not has_model:
-                            raise ValueError(f"Model '{self.model}' is not installed in Ollama. Please manually install it via 'ollama pull {self.model}'.")
-            except httpx.RequestError:
-                logger.warning("Could not connect to Ollama to check models.")
-            except ValueError:
-                raise
+            # Check if model is actually installed (cached to eliminate per-request HTTP latency)
+            global _INSTALLED_MODELS_CACHE
+            if _INSTALLED_MODELS_CACHE is None or not any(
+                m == self.model or m.startswith(self.model + ":") or self.model.startswith(m + ":")
+                for m in _INSTALLED_MODELS_CACHE
+            ):
+                try:
+                    import httpx
+                    tags_url = ollama_base_url.replace("/v1", "") + "/api/tags"
+                    with httpx.Client(timeout=2.0) as client:
+                        resp = client.get(tags_url)
+                        if resp.status_code == 200:
+                            models = set(m.get("name") for m in resp.json().get("models", []))
+                            _INSTALLED_MODELS_CACHE = models
+                except httpx.RequestError:
+                    logger.warning("Could not connect to Ollama to check models.")
+                except Exception:
+                    pass
+
+            if _INSTALLED_MODELS_CACHE is not None:
+                has_model = any(
+                    m == self.model or m.startswith(self.model + ":") or self.model.startswith(m + ":")
+                    or (":" not in self.model and m.startswith(self.model + ":"))
+                    for m in _INSTALLED_MODELS_CACHE
+                )
+                if not has_model and len(_INSTALLED_MODELS_CACHE) > 0:
+                    raise ValueError(f"Model '{self.model}' is not installed in Ollama. Please manually install it via 'ollama pull {self.model}'.")
 
             self.supports_tools = check_native_tool_support(self.provider_type, self.model, ollama_base_url)
             self.pi_provider = OllamaCompatibleProvider(
@@ -184,10 +275,10 @@ class PiFrameworkProvider(LLMProvider):
         if hasattr(self.pi_provider, "max_tokens"):
             self.pi_provider.max_tokens = target_max_tokens
 
-        # When native tool calling is supported:
-        # For local providers, only register writing_tool if the request actually requires writing an artifact.
-        # This prevents qwen3:4b from entering unnecessary tool calling loops and thinking hangs on normal chat.
-        if self.supports_tools and (self.provider_type != "local" or is_writing):
+        # For local providers, do not bind writing_tool as native function calling.
+        # Instead, let the model generate XML markup directly as instructed by WRITING_SKILL_PROMPT.
+        # This ensures all generated text streams live to the UI in real time.
+        if self.supports_tools and self.provider_type != "local":
             registry = ToolRegistry([writing_tool])
         else:
             registry = ToolRegistry([])
@@ -237,7 +328,7 @@ class PiFrameworkProvider(LLMProvider):
         if hasattr(self.pi_provider, "max_tokens"):
             self.pi_provider.max_tokens = target_max_tokens
         
-        if self.supports_tools and (self.provider_type != "local" or is_writing):
+        if self.supports_tools and self.provider_type != "local":
             registry = ToolRegistry([writing_tool])
         else:
             registry = ToolRegistry([])

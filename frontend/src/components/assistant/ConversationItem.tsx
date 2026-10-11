@@ -51,7 +51,7 @@ export function ConversationItem({
             setEditing(false);
           }
         }}
-        className="w-full rounded-md border border-primary/50 bg-card px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        className="w-full rounded-md border border-border bg-card px-2.5 py-1.5 text-[13.5px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
       />
     );
   }
@@ -59,21 +59,20 @@ export function ConversationItem({
   return (
     <div
       className={cn(
-        "group grid grid-cols-[minmax(0,1fr)_auto] items-center rounded-md transition-colors",
-        active ? "bg-sidebar-accent text-sidebar-accent-foreground" : "hover:bg-sidebar-accent/60",
+        "group flex items-center justify-between rounded-lg border text-[13.5px] transition-all duration-150",
+        active
+          ? "border-white/[0.08] bg-white/[0.07] text-foreground font-medium"
+          : "border-transparent text-sidebar-foreground/75 hover:bg-white/[0.04] hover:text-foreground",
       )}
     >
-      <Button
-        variant="ghost"
+      <button
+        type="button"
         onClick={onSelect}
         aria-current={active ? "page" : undefined}
-        className="block h-10 min-w-0 flex-1 truncate rounded-md px-2.5 py-2.5 text-left text-[13px] font-normal hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="flex h-9.5 min-w-0 flex-1 items-center truncate px-2.5 text-left text-[13.5px] font-normal focus-visible:outline-none"
       >
-        {active && (
-          <span className="mr-2 inline-block size-1.5 rounded-full bg-primary align-middle" />
-        )}
-        {conv.title}
-      </Button>
+        <span className="truncate">{conv.title}</span>
+      </button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -85,16 +84,23 @@ export function ConversationItem({
             <MoreHorizontal className="size-4" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
+        <DropdownMenuContent
+          align="end"
+          className="w-34 border border-border bg-popover p-1 shadow-md"
+        >
           <DropdownMenuItem
             onSelect={() => {
               setTitle(conv.title);
               setTimeout(() => setEditing(true), 0);
             }}
+            className="text-[13px]"
           >
             <Pencil className="size-3.5" /> Rename
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={onDelete} className="text-destructive focus:text-destructive">
+          <DropdownMenuItem
+            onSelect={onDelete}
+            className="text-[13px] text-destructive focus:bg-destructive/10 focus:text-destructive"
+          >
             <Trash2 className="size-3.5" /> Delete
           </DropdownMenuItem>
         </DropdownMenuContent>

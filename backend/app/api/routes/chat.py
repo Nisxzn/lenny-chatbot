@@ -1,4 +1,5 @@
 import uuid
+import re
 import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -7,10 +8,10 @@ from app.models.conversation import Conversation
 from app.models.message import Message
 from app.schemas.chat import ChatRequest, ChatResponse, Citation
 from app.schemas.rag import SearchQuery
-from app.services.llm import get_llm_provider
+from app.services.llm import get_llm_provider, is_writing_request
 from app.services.vector_store import get_vector_store
 from app.services.retrieval import RetrievalService
-from app.services.writing import WRITING_SKILL_PROMPT, extract_artifacts
+from app.services.writing import WRITING_SKILL_PROMPT, extract_artifacts, generate_conversation_title
 from app.models.artifact import Artifact
 from app.schemas.artifact import ArtifactResponse
 from app.core.config import settings
@@ -21,18 +22,45 @@ import time
 router = APIRouter()
 logger = logging.getLogger("rag.diag")
 
-SYSTEM_PROMPT = """You are The Lenny Growth Assistant. Your job is to answer product management and growth questions using the provided retrieved context from Lenny's Podcast transcripts.
-You must strictly prioritize the retrieved evidence. Distinguish clearly between evidence from the context (explicitly citing the speaker/guest and episode) and your own general reasoning or suggestions.
+BASE_SYSTEM_PROMPT = """You are The Lenny Growth Assistant, an AI growth and product advisor inspired by Lenny Rachitsky's podcast, newsletter, and interviews.
+
+CONVERSATIONAL & GREETING GUIDELINES:
+- When the user sends a greeting (e.g. "hi", "hello", "hey", "how are you"), responds politely, or asks what you can do or what model/assistant you are, respond warmly, conversationally, and concisely as The Lenny Growth Assistant.
+- For simple greetings, introductions, or pleasantries, NEVER state "No relevant context found in Lenny's Podcast transcripts" or complain about lack of context. Simply introduce yourself and offer to help with growth, product strategy, retention, pricing, hiring, or Lenny's podcast wisdom.
+- If the user asks about the model or system, explain politely that you are The Lenny Growth Assistant running on their selected model (local Ollama or Cloud).
 
 SUMMARIZATION & GROUNDING GUIDELINES:
+- When the user asks a substantive product, growth, or podcast question and retrieved context is provided, prioritize the evidence from Lenny's podcast. Distinguish clearly between evidence from the context (citing the speaker/guest and episode) and your own general reasoning.
 - When asked to summarize Lenny's podcast or specific episodes, summarize only the key ideas, frameworks, actionable takeaways, and concrete examples from the provided context without inventing claims.
-- If the retrieved context contains excerpts from specific episodes (e.g. Brian Chesky, Elena Verna, or Lenny Rachitsky), summarize what they actually said and clearly attribute their points.
-- If the retrieved context does not contain sufficient information to answer the question, or if no relevant podcast transcripts were found, explicitly state this limitation and invite the user to ask about specific guests, episodes, or topics. You may then optionally provide general product advice, but clearly indicate that it is not from Lenny's podcast.
+- If the question is specifically about Lenny's podcast or guest advice but no podcast context is found, politely state that you didn't find specific podcast episodes on that topic, and provide helpful general advice.
 - Never invent podcast quotations, episode titles, URLs, timestamps, or citations.
-- Do not cite or reuse sources from previous turns unless they are present in the context retrieved for this turn.
-- Keep regular conversational answers concise and structured, but when the user requests an essay, article, or document, you must follow the WRITING SKILL INSTRUCTIONS below to generate a comprehensive, structured artifact.
+- Respond directly and concisely. Do NOT output <think> tags, scratchpads, or internal reasoning blocks in the final answer.
+- Only invoke or format documents when the user specifically requests a long-form document, essay, article, or checklist.
+"""
 
-""" + WRITING_SKILL_PROMPT
+SYSTEM_PROMPT = BASE_SYSTEM_PROMPT + "\n\n" + WRITING_SKILL_PROMPT
+
+def is_greeting_or_meta_query(text: str) -> bool:
+    """Detects whether a user prompt is a greeting, pleasantry, or meta question about the assistant."""
+    cleaned = re.sub(r"[^\w\s]", "", text.strip().lower())
+    if not cleaned:
+        return True
+    words = cleaned.split()
+    
+    # Exact single-word or short greetings
+    greetings = {
+        "hi", "hello", "hey", "hiya", "howdy", "sup", "yo", "greetings",
+        "good morning", "good afternoon", "good evening", "good day",
+        "how are you", "how are you doing", "hows it going", "how is it going",
+        "whats up", "what's up", "who are you", "what can you do", "help",
+        "what are you", "what model are you", "which model are you",
+        "tell me about yourself", "introduce yourself"
+    }
+    if cleaned in greetings:
+        return True
+    if len(words) <= 3 and any(w in ["hi", "hello", "hey", "howdy", "greetings"] for w in words):
+        return True
+    return False
 
 def is_podcast_summary_query(text: str) -> bool:
     """Detects whether a user prompt requests a general overview or summary of Lenny's podcast."""
@@ -57,9 +85,15 @@ def chat_endpoint(req: ChatRequest, db: Session = Depends(get_db)):
         conv = db.query(Conversation).filter(Conversation.id == conversation_id).first()
         if not conv:
             raise HTTPException(status_code=404, detail="Conversation not found")
+        # If existing conversation still has default placeholder title, give it a meaningful title from this first prompt
+        if not conv.title or conv.title.strip().lower() in ["new chat", "new conversation", "untitled", ""]:
+            conv.title = generate_conversation_title(req.message)
+            db.commit()
+            db.refresh(conv)
     else:
-        # Create new conversation
-        conv = Conversation(title=req.message[:50])
+        # Create new conversation with clean, meaningful title (like ChatGPT/Claude)
+        meaningful_title = generate_conversation_title(req.message)
+        conv = Conversation(title=meaningful_title)
         db.add(conv)
         db.commit()
         db.refresh(conv)
@@ -105,10 +139,24 @@ def chat_endpoint(req: ChatRequest, db: Session = Depends(get_db)):
                         meta.speaker or 'N/A',
                         meta.timestamp or 'N/A',
                         r.chunk.document_id)
+            
+            # Only include genuine sources with a real episode title or URL (no mock/demo/empty sources)
+            ep_title = (meta.episode_title or "").strip()
+            ep_speaker = (meta.speaker or "").strip()
+            lower_meta = f"{ep_title} {ep_speaker}".lower()
+            if not ep_title and not meta.url:
+                continue
+            if (
+                "mock" in lower_meta
+                or "fictional" in lower_meta
+                or ep_title.lower() in ["unknown", "unknown episode", "n/a"]
+            ):
+                continue
+
             citations.append(Citation(
-                episode_title=meta.episode_title,
+                episode_title=ep_title,
                 url=meta.url,
-                speaker=meta.speaker,
+                speaker=ep_speaker,
                 timestamp=meta.timestamp,
                 content=r.chunk.text
             ))
@@ -144,7 +192,17 @@ def chat_endpoint(req: ChatRequest, db: Session = Depends(get_db)):
     history = db.query(Message).filter(Message.conversation_id == conversation_id).order_by(Message.created_at.asc()).all()
     messages = [{"role": h.role, "content": h.content} for h in history[:-1]]
 
-    user_prompt = f"Context Information:\n{retrieved_text}\n\nUser Question:\n{req.message}"
+    is_writing = is_writing_request(req.message)
+    is_greeting = is_greeting_or_meta_query(req.message)
+    effective_system_prompt = SYSTEM_PROMPT if is_writing else BASE_SYSTEM_PROMPT
+
+    direct_hint = "" if is_writing else "\n\n(Important: Answer directly and concisely. Do NOT output <think> or internal reasoning tags.)"
+    if is_greeting:
+        user_prompt = f"User Message:\n{req.message}\n\n(Note: This is a greeting/introduction. Respond conversationally and warmly without referencing search or missing transcripts.){direct_hint}"
+    elif context_blocks:
+        user_prompt = f"Context Information:\n{retrieved_text}\n\nUser Question:\n{req.message}{direct_hint}"
+    else:
+        user_prompt = f"User Question:\n{req.message}\n\n(Note: No specific podcast transcripts matched this query. Provide helpful general growth/product advice while mentioning that it is general advice rather than a specific Lenny podcast citation.){direct_hint}"
     messages.append({"role": "user", "content": user_prompt})
 
     if getattr(req, "stream", False):
@@ -155,7 +213,7 @@ def chat_endpoint(req: ChatRequest, db: Session = Depends(get_db)):
 
         def stream_generator():
             q = queue.Queue()
-            state = {"in_think": False, "buffer": ""}
+            state = {"in_think": False, "buffer": "", "last_status": time.time()}
             
             def on_event(event_type, payload):
                 if event_type == "assistant_delta":
@@ -169,6 +227,7 @@ def chat_endpoint(req: ChatRequest, db: Session = Depends(get_db)):
                                 state["in_think"] = True
                                 state["buffer"] = post
                                 q.put({"type": "status", "message": "Thinking..."})
+                                q.put({"type": "think_start"})
                             elif any(state["buffer"].endswith("<" + s) for s in ["", "t", "th", "thi", "thin", "think"]):
                                 break
                             else:
@@ -178,19 +237,29 @@ def chat_endpoint(req: ChatRequest, db: Session = Depends(get_db)):
                                 break
                         else:
                             if "</think>" in state["buffer"]:
-                                pre, post = state["buffer"].split("</think>", 1)
+                                thought, post = state["buffer"].split("</think>", 1)
                                 state["in_think"] = False
                                 state["buffer"] = post
+                                if thought:
+                                    q.put({"type": "think_delta", "text": thought})
+                                q.put({"type": "think_end"})
                                 q.put({"type": "status", "message": "Generating your answer..."})
-                            else:
-                                prefixes = ["</think", "</thin", "</thi", "</th", "</t", "</", "<"]
-                                match = ""
-                                for p in prefixes:
-                                    if state["buffer"].endswith(p):
-                                        match = p
-                                        break
-                                state["buffer"] = match
+                            elif any(state["buffer"].endswith("</" + s) for s in ["", "t", "th", "thi", "thin", "think"]):
                                 break
+                            else:
+                                # Stream out thinking content incrementally without putting it into text_delta
+                                if state["buffer"]:
+                                    q.put({"type": "think_delta", "text": state["buffer"]})
+                                    state["buffer"] = ""
+                                
+                                now = time.time()
+                                if now - state["last_status"] >= 8.0:
+                                    state["last_status"] = now
+                                    q.put({"type": "status", "message": "Reasoning with Lenny's insights..."})
+                                break
+                elif event_type == "assistant_text":
+                    if payload:
+                        q.put({"type": "text_delta", "text": payload})
                 elif event_type == "tool_call":
                     tool_name = getattr(payload, "name", "")
                     if tool_name in ["write_artifact", "create_artifact"]:
@@ -199,25 +268,48 @@ def chat_endpoint(req: ChatRequest, db: Session = Depends(get_db)):
             def run_agent():
                 try:
                     q.put({"type": "status", "message": "Generating your answer..."})
-                    resp_text, actual_prov, mod_name = llm.generate_streamed_response(SYSTEM_PROMPT, messages, on_event)
-                    if state["buffer"]:
-                        q.put({"type": "text_delta", "text": state["buffer"]})
-                        state["buffer"] = ""
+                    if is_greeting:
+                        resp_text, actual_prov, mod_name = llm.generate_response(effective_system_prompt, messages)
+                        q.put({"type": "text_delta", "text": resp_text})
+                    else:
+                        resp_text, actual_prov, mod_name = llm.generate_streamed_response(effective_system_prompt, messages, on_event)
+                        if state["buffer"]:
+                            q.put({"type": "text_delta", "text": state["buffer"]})
+                            state["buffer"] = ""
                     q.put({"type": "agent_done", "response_text": resp_text, "provider": actual_prov, "model": mod_name})
                 except Exception as e:
+                    logger.exception("Error in run_agent thread: %s", e)
                     q.put({"type": "error", "message": str(e)})
 
             thread = threading.Thread(target=run_agent, daemon=True)
             thread.start()
+            conv_current = db.query(Conversation).filter(Conversation.id == conversation_id).first()
+            conv_title_str = conv_current.title if conv_current else None
             
-            yield f"data: {json.dumps({'type': 'init', 'conversationId': str(conversation_id), 'citations': [c.model_dump() for c in citations]})}\n\n"
+            yield f"data: {json.dumps({'type': 'init', 'conversationId': str(conversation_id), 'conversationTitle': conv_title_str, 'citations': [c.model_dump() for c in citations]})}\n\n"
+            
+            start_stream_time = time.time()
+            last_keepalive_time = time.time()
             
             while True:
                 try:
-                    event = q.get(timeout=settings.LLM_TIMEOUT_SECONDS)
+                    event = q.get(timeout=2.0)
                 except queue.Empty:
-                    yield f"data: {json.dumps({'type': 'error', 'message': 'Response generation timed out. Please try again.'})}\n\n"
-                    break
+                    now = time.time()
+                    if thread.is_alive():
+                        if now - start_stream_time > settings.LLM_TIMEOUT_SECONDS:
+                            logger.error("LLM generation exceeded absolute timeout of %ds", settings.LLM_TIMEOUT_SECONDS)
+                            yield f"data: {json.dumps({'type': 'error', 'message': 'Response generation timed out. Please try again.'})}\n\n"
+                            break
+                        
+                        if now - last_keepalive_time >= 5.0:
+                            last_keepalive_time = now
+                            yield ": keepalive\n\n"
+                        continue
+                    else:
+                        logger.error("LLM inference thread terminated unexpectedly")
+                        yield f"data: {json.dumps({'type': 'error', 'message': 'Generation stopped unexpectedly. Please try again.'})}\n\n"
+                        break
 
                 if event["type"] == "agent_done":
                     db_stream = SessionLocal()
@@ -258,12 +350,13 @@ def chat_endpoint(req: ChatRequest, db: Session = Depends(get_db)):
                             ))
                         
                         conv_stream = db_stream.query(Conversation).filter(Conversation.id == conversation_id).first()
+                        conv_title_done = conv_stream.title if conv_stream else None
                         if conv_stream:
                             conv_stream.updated_at = datetime.now(timezone.utc)
                             db_stream.commit()
                             
                         # Format dates properly using pydantic model_dump with mode='json'
-                        yield f"data: {json.dumps({'type': 'done', 'data': {'id': str(ast_msg_stream.id), 'content': cleaned, 'artifacts': [a.model_dump(mode='json') for a in saved_artifacts], 'citations': [c.model_dump(mode='json') for c in citations]}})}\n\n"
+                        yield f"data: {json.dumps({'type': 'done', 'data': {'id': str(ast_msg_stream.id), 'conversationId': str(conversation_id), 'conversationTitle': conv_title_done, 'content': cleaned, 'artifacts': [a.model_dump(mode='json') for a in saved_artifacts], 'citations': [c.model_dump(mode='json') for c in citations]}})}\n\n"
                         yield "data: [DONE]\n\n"
                     finally:
                         db_stream.close()
@@ -278,7 +371,7 @@ def chat_endpoint(req: ChatRequest, db: Session = Depends(get_db)):
 
     llm_start = time.perf_counter()
     try:
-        response_text, actual_provider, model_name = llm.generate_response(SYSTEM_PROMPT, messages)
+        response_text, actual_provider, model_name = llm.generate_response(effective_system_prompt, messages)
     except Exception as e:
         error_str = str(e)
         if "401" in error_str or "Authentication" in error_str:
@@ -341,6 +434,7 @@ def chat_endpoint(req: ChatRequest, db: Session = Depends(get_db)):
 
     return ChatResponse(
         conversation_id=conversation_id,
+        conversation_title=conv.title,
         user_message_id=user_msg.id,
         assistant_message_id=ast_msg.id,
         response_text=cleaned_response_text,

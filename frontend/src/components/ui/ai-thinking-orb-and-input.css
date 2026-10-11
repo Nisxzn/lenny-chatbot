@@ -1,0 +1,791 @@
+/* Styles for the MorphOrb component. Channels (--w, --h, --oPill …) are set from JS. */
+
+@property --angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.mo-root {
+  --mo-bg: transparent;
+  --mo-surface: oklch(0.14 0 0);
+  --mo-surface-2: oklch(0.17 0 0);
+  --mo-line: oklch(0.24 0 0);
+  --mo-text: oklch(1 0 0);
+  --mo-muted: oklch(0.68 0 0);
+  --mo-green: oklch(1 0 0);
+  --mo-green-soft: rgba(255, 255, 255, 0.18);
+  --oCenter: 0;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  color: var(--mo-text);
+  font-family: var(--font-sans, "Geist", sans-serif);
+  -webkit-font-smoothing: antialiased;
+  isolation: isolate;
+  z-index: 1;
+}
+
+.mo-bg {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(120% 80% at 50% 110%, rgba(255, 255, 255, 0.02) 0%, transparent 60%),
+    radial-gradient(60% 50% at 50% 0%, oklch(0.1 0 0) 0%, transparent 70%), var(--mo-bg);
+}
+.mo-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 22px 22px;
+  mask-image: radial-gradient(60% 55% at 50% 46%, #000 0%, transparent 100%);
+}
+
+.mo-halo {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 520px;
+  height: 520px;
+  z-index: -1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.05) 0%,
+    rgba(255, 255, 255, 0.02) 40%,
+    transparent 70%
+  );
+  opacity: var(--oCenter);
+  pointer-events: none;
+}
+
+/* ── idle hero branding ── */
+.mo-hero {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% - 50% + 78px);
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 640px;
+  width: calc(100% - 32px);
+  padding: 0 16px;
+  z-index: 0;
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+.mo-root:not([data-phase="idle"]) .mo-hero {
+  opacity: 0;
+  transform: translate(-50%, -10px);
+  pointer-events: none;
+}
+.mo-hero-title {
+  margin: 14px 0 0;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: var(--mo-text);
+  line-height: 1.25;
+}
+.mo-hero-sub {
+  margin: 6px 0 0;
+  font-size: 14.5px;
+  color: var(--mo-muted);
+  line-height: 1.5;
+}
+
+/* ── moving stage ── */
+.mo-mover {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  will-change: transform;
+}
+
+.mo-trail {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 40% 35%, oklch(0.24 0 0), oklch(0.14 0 0) 70%);
+  box-shadow: 0 0 24px rgba(255, 255, 255, 0.08);
+}
+
+.mo-actor {
+  --w: 680px;
+  --h: 56px;
+  --r: 999px;
+  --oGlow: 1;
+  --oHalo: 0;
+  --oPill: 1;
+  --oBall: 0;
+  --oGreen: 0;
+  --oCard: 0;
+  --oRing: 1;
+  --oInput: 1;
+  --oAur: 1;
+  --inScale: 1;
+  --gs: 0.55;
+  --cs: 1;
+  --hOp: 0;
+  --dotS: 0;
+  --bloom: 1;
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--w);
+  height: var(--h);
+  border-radius: var(--r);
+  transform: translate(-50%, -50%) scale(var(--cs));
+  will-change: width, height, transform;
+}
+.mo-actor[data-shake] {
+  animation: mo-shake 0.26s ease-in-out;
+}
+
+.mo-actor > * {
+  position: absolute;
+  border-radius: inherit;
+}
+
+.mo-underglow {
+  inset: 10px -6px -14px;
+  background: radial-gradient(60% 80% at 50% 100%, rgba(255, 255, 255, 0.08), transparent 70%);
+  filter: blur(16px);
+  opacity: var(--oGlow);
+  pointer-events: none;
+}
+
+.mo-halo-green {
+  inset: -40px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--mo-green-soft), transparent 65%);
+  filter: blur(10px);
+  opacity: var(--oHalo);
+  pointer-events: none;
+}
+
+.mo-surface {
+  inset: 0;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--mo-surface-2), var(--mo-surface));
+  border: 1px solid var(--mo-line);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 10px 30px -10px rgba(0, 0, 0, 0.7);
+  opacity: var(--oPill);
+}
+
+.mo-aurora {
+  position: absolute;
+  inset: -40% -20%;
+  opacity: calc(var(--oAur) * 0.35);
+  filter: blur(22px);
+  animation: mo-drift 7s ease-in-out infinite alternate;
+}
+.mo-aurora i {
+  position: absolute;
+  width: 40%;
+  height: 120%;
+  top: 0;
+  border-radius: 50%;
+  opacity: 0.2;
+}
+.mo-aurora i:nth-child(1) {
+  left: 0%;
+  background: #666;
+}
+.mo-aurora i:nth-child(2) {
+  left: 22%;
+  background: #888;
+}
+.mo-aurora i:nth-child(3) {
+  left: 45%;
+  background: #444;
+}
+.mo-aurora i:nth-child(4) {
+  left: 68%;
+  background: #777;
+}
+
+.mo-ball {
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 38% 32%,
+    oklch(0.3 0 0),
+    oklch(0.18 0 0) 65%,
+    oklch(0.1 0 0)
+  );
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.16),
+    0 0 24px rgba(255, 255, 255, 0.08);
+  opacity: var(--oBall);
+}
+
+.mo-green {
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 40% 35%,
+    oklch(0.95 0 0),
+    var(--mo-green) 55%,
+    oklch(0.65 0 0)
+  );
+  box-shadow: 0 0 30px var(--mo-green-soft);
+  transform: scale(var(--gs));
+  opacity: var(--oGreen);
+}
+
+.mo-card {
+  inset: 0;
+  background: linear-gradient(180deg, oklch(0.16 0 0), oklch(0.13 0 0));
+  border: 1px solid var(--mo-line);
+  box-shadow:
+    0 0 calc(40px * var(--bloom)) rgba(255, 255, 255, calc(0.06 * var(--bloom))),
+    0 20px 40px -16px rgba(0, 0, 0, 0.8);
+  opacity: var(--oCard);
+}
+
+.mo-ring {
+  inset: -1px;
+  padding: 1px;
+  background: conic-gradient(
+    from var(--angle),
+    rgba(255, 255, 255, 0.06) 0deg,
+    rgba(255, 255, 255, 0.45) 60deg,
+    rgba(255, 255, 255, 0.06) 140deg,
+    rgba(255, 255, 255, 0.06) 220deg,
+    rgba(255, 255, 255, 0.35) 290deg,
+    rgba(255, 255, 255, 0.06) 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: var(--oRing);
+  animation: mo-spin 6s linear infinite;
+  pointer-events: none;
+}
+.mo-actor[data-typing] .mo-ring {
+  animation-duration: 1.6s;
+}
+.mo-actor[data-flash] .mo-ring {
+  background: oklch(0.63 0.22 25);
+}
+
+/* ── input ── */
+.mo-input {
+  inset: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 9px 0 18px;
+  opacity: var(--oInput);
+  transform: scale(var(--inScale));
+}
+.mo-root:not([data-phase="idle"]) .mo-input {
+  pointer-events: none;
+}
+
+.mo-spark {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: var(--mo-muted);
+}
+
+.mo-field {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--mo-text);
+  font: inherit;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+.mo-field::placeholder {
+  color: var(--mo-muted);
+}
+
+.mo-send {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--mo-muted);
+  transition:
+    background 0.2s,
+    color 0.2s,
+    transform 0.2s;
+}
+.mo-send svg {
+  width: 18px;
+  height: 18px;
+}
+.mo-send[data-ready] {
+  background: oklch(1 0 0);
+  color: oklch(0 0 0);
+}
+.mo-send[data-ready]:hover {
+  transform: scale(1.05);
+  background: oklch(0.92 0 0);
+}
+.mo-send:focus-visible {
+  outline: 2px solid oklch(0.5 0 0);
+  outline-offset: 2px;
+}
+
+/* ── orb ── */
+.mo-orb {
+  left: 50%;
+  top: 50%;
+  width: 220px;
+  height: 220px;
+  border-radius: 0;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.mo-pulse {
+  left: 50%;
+  top: 50%;
+  width: 132px;
+  height: 132px;
+  margin: -66px 0 0 -66px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ── answer card ── */
+.mo-answer {
+  inset: 0;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+  outline: none;
+  visibility: hidden;
+}
+.mo-root[data-phase="unfold"] .mo-answer,
+.mo-root[data-phase="answered"] .mo-answer,
+.mo-root[data-phase="reset"] .mo-answer {
+  visibility: visible;
+}
+.mo-root[data-phase="reset"] .mo-answer {
+  opacity: var(--oCard);
+}
+
+.mo-a-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mo-muted);
+  opacity: var(--hOp);
+}
+.mo-a-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--mo-green);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+  transform: scale(var(--dotS));
+}
+
+.mo-a-body {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--mo-text);
+}
+.mo-w {
+  display: inline;
+  opacity: 1;
+}
+
+/* ── status label under the orb ── */
+.mo-status {
+  --sOp: 0;
+  --sTy: 6;
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 88px);
+  height: 24px;
+  width: 220px;
+  margin-left: -110px;
+  opacity: var(--sOp);
+  transform: translateY(calc(var(--sTy) * 1px));
+  pointer-events: none;
+}
+.mo-lab {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 3px;
+  font-size: 13.5px;
+  font-weight: 450;
+  color: var(--mo-muted);
+  letter-spacing: -0.01em;
+}
+.mo-lab.mo-in {
+  animation: mo-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.mo-lab.mo-out {
+  animation: mo-out 0.24s ease-in both;
+}
+
+.mo-lab-t {
+  background: linear-gradient(90deg, var(--mo-muted) 0%, var(--mo-text) 50%, var(--mo-muted) 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: mo-shimmer 2.2s linear infinite;
+}
+.mo-lab-done {
+  color: var(--mo-green);
+}
+.mo-dots {
+  display: inline-flex;
+  gap: 2.5px;
+  margin-left: 3px;
+}
+.mo-dots i {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--mo-muted);
+  animation: mo-dot 1.2s infinite;
+}
+.mo-dots i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.mo-dots i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+/* ── new question button ── */
+.mo-reset {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 88px);
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--mo-line);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--mo-text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  transition: background 0.2s;
+}
+.mo-reset:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+.mo-root[data-phase="answered"] .mo-reset {
+  visibility: visible;
+  animation: mo-fade-in 0.4s ease-out both;
+}
+
+.mo-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ── debug ── */
+.mo-debug {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--mo-muted);
+}
+.mo-debug label {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.mo-debug button {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--mo-line);
+  background: transparent;
+  color: var(--mo-text);
+  cursor: pointer;
+}
+.mo-chip {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mo-aurora,
+  .mo-composer-aurora,
+  .mo-ring,
+  .mo-composer-ring,
+  .mo-lab-t,
+  .mo-dots i {
+    animation: none;
+  }
+}
+
+/* ────────────────────────── standalone composer ────────────────────────── */
+@keyframes mo-composer-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-5px);
+  }
+  75% {
+    transform: translateX(5px);
+  }
+}
+
+.mo-composer-root {
+  --mo-surface: oklch(0.14 0 0);
+  --mo-surface-2: oklch(0.17 0 0);
+  --mo-line: oklch(0.24 0 0);
+  --mo-text: oklch(1 0 0);
+  --mo-muted: oklch(0.68 0 0);
+  --mo-green: oklch(1 0 0);
+  --mo-green-soft: rgba(255, 255, 255, 0.18);
+  position: relative;
+  width: 100%;
+}
+
+.mo-composer-box {
+  position: relative;
+  width: 100%;
+  border-radius: 999px;
+  transition: border-radius 0.2s ease;
+}
+.mo-composer-box.mo-multiline {
+  border-radius: 28px;
+}
+.mo-composer-box[data-shake] {
+  animation: mo-composer-shake 0.26s ease-in-out;
+}
+
+.mo-composer-underglow {
+  position: absolute;
+  inset: 4px -2px -8px;
+  border-radius: inherit;
+  background: radial-gradient(60% 80% at 50% 100%, rgba(255, 255, 255, 0.05), transparent 70%);
+  filter: blur(14px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.mo-composer-surface {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  background: linear-gradient(180deg, var(--mo-surface-2), var(--mo-surface));
+  border: 1px solid var(--mo-line);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 10px 28px -8px rgba(0, 0, 0, 0.7);
+  z-index: 1;
+}
+
+.mo-composer-aurora {
+  position: absolute;
+  inset: -40% -20%;
+  opacity: 0.3;
+  filter: blur(22px);
+  animation: mo-drift 7s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+.mo-composer-aurora i {
+  position: absolute;
+  width: 40%;
+  height: 120%;
+  top: 0;
+  border-radius: 50%;
+  opacity: 0.2;
+}
+.mo-composer-aurora i:nth-child(1) {
+  left: 0%;
+  background: #666;
+}
+.mo-composer-aurora i:nth-child(2) {
+  left: 22%;
+  background: #888;
+}
+.mo-composer-aurora i:nth-child(3) {
+  left: 45%;
+  background: #444;
+}
+.mo-composer-aurora i:nth-child(4) {
+  left: 68%;
+  background: #777;
+}
+
+.mo-composer-ring {
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(
+    from var(--angle, 0deg),
+    rgba(255, 255, 255, 0.06) 0deg,
+    rgba(255, 255, 255, 0.4) 60deg,
+    rgba(255, 255, 255, 0.06) 140deg,
+    rgba(255, 255, 255, 0.06) 220deg,
+    rgba(255, 255, 255, 0.3) 290deg,
+    rgba(255, 255, 255, 0.06) 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: mo-spin 6s linear infinite;
+  pointer-events: none;
+  z-index: 2;
+}
+.mo-composer-box[data-typing] .mo-composer-ring {
+  animation-duration: 1.6s;
+}
+.mo-composer-box:focus-within .mo-composer-ring {
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.12);
+}
+
+.mo-composer-row {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px 6px 18px;
+  min-height: 52px;
+}
+
+.mo-composer-spark {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: var(--mo-muted);
+  align-self: center;
+}
+
+.mo-composer-field {
+  flex: 1;
+  min-width: 0;
+  max-height: 180px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--mo-text);
+  font-family: inherit;
+  font-size: 16px;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  resize: none;
+  padding: 6px 0;
+}
+.mo-composer-field::placeholder {
+  color: var(--mo-muted);
+}
+
+.mo-composer-actions {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: center;
+  margin: 0;
+}
+
+.mo-input .mo-composer-actions {
+  align-self: center;
+  margin: 0;
+}
+
+.mo-composer-box.mo-multiline .mo-composer-actions {
+  align-self: flex-end;
+  margin-bottom: 2px;
+}
+
+.mo-composer-btn {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--mo-muted);
+  transition:
+    background 0.2s,
+    color 0.2s,
+    transform 0.2s;
+}
+.mo-composer-btn svg {
+  width: 18px;
+  height: 18px;
+}
+.mo-composer-btn[data-ready] {
+  background: oklch(1 0 0);
+  color: oklch(0 0 0);
+  cursor: pointer;
+}
+.mo-composer-btn[data-ready]:hover {
+  transform: scale(1.05);
+  background: oklch(0.92 0 0);
+}
+.mo-composer-btn:focus-visible {
+  outline: 2px solid oklch(0.5 0 0);
+  outline-offset: 2px;
+}
+.mo-composer-btn.mo-composer-stop {
+  background: oklch(0.63 0.22 25);
+  color: oklch(1 0 0);
+}
+.mo-composer-btn.mo-composer-stop:hover {
+  transform: scale(1.05);
+  background: oklch(0.58 0.22 25);
+}

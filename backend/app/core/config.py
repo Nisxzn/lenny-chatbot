@@ -26,7 +26,7 @@ class Settings(BaseSettings):
 
     # LLM Settings
     OLLAMA_BASE_URL: str = "http://localhost:11434"
-    OLLAMA_MODEL_NAME: str = "qwen3:4b"
+    OLLAMA_MODEL_NAME: str = "llama3:latest"
     OLLAMA_EMBEDDING_MODEL: str = "nomic-embed-text"
     
     OPENROUTER_API_KEY: Optional[str] = None
@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     DEFAULT_LLM_PROVIDER: str = "local"
     CHAT_MAX_TOKENS: int = 2048
     ESSAY_MAX_TOKENS: int = 4096
-    LLM_TIMEOUT_SECONDS: int = 120
+    LLM_TIMEOUT_SECONDS: int = 300
 
     # Legacy Anthropic settings
     ANTHROPIC_API_KEY: Optional[str] = None

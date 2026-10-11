@@ -57,11 +57,11 @@ const pricingArtifact: Artifact = {
   h1{text-align:center;font-weight:600;margin-bottom:32px}
   .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;max-width:820px;margin:0 auto}
   .card{background:#fff;border:1px solid #e7e2da;border-radius:12px;padding:24px}
-  .card.pro{border-color:#c2410c;box-shadow:0 4px 20px rgba(194,65,12,.12)}
+  .card.pro{border-color:#1c1917;box-shadow:0 4px 20px rgba(0,0,0,.12)}
   .price{font-size:32px;font-weight:700;margin:8px 0}
   ul{padding-left:18px;line-height:1.8;color:#57534e}
   button{width:100%;padding:10px;border-radius:8px;border:0;background:#1c1917;color:#fff;font-weight:600}
-  .pro button{background:#c2410c}
+  .pro button{background:#000}
 </style></head><body>
 <h1>Simple pricing that grows with you</h1>
 <div class="grid">
@@ -109,22 +109,7 @@ What to do next:
 3. Make that behaviour the default path in onboarding
 
 I've drafted a retention review template you can reuse.`,
-    sources: [
-      src(
-        "s1",
-        "Why retention curves beat vanity metrics",
-        "Fictional Guest A",
-        "Ep. 101 (mock)",
-        "14:32",
-      ),
-      src(
-        "s2",
-        "Net revenue retention in practice",
-        "Fictional Guest B",
-        "Ep. 118 (mock)",
-        "38:05",
-      ),
-    ],
+    sources: [],
     artifact: retentionArtifact,
   },
   {
@@ -137,9 +122,7 @@ A common starting structure:
 - **Team / Enterprise** for security and admin needs
 
 Talk to 10 customers before changing prices, and grandfather existing users. Here's a simple three-tier page you can preview.`,
-    sources: [
-      src("s3", "Pricing is a product decision", "Fictional Guest C", "Ep. 87 (mock)", "22:10"),
-    ],
+    sources: [],
     artifact: pricingArtifact,
   },
   {
@@ -151,10 +134,7 @@ Talk to 10 customers before changing prices, and grandfather existing users. Her
 - Use templates or sample data so the product never looks empty
 
 I've put together a checklist you can work through with your team.`,
-    sources: [
-      src("s4", "Designing for the aha moment", "Fictional Guest D", "Ep. 132 (mock)", "09:47"),
-      src("s5", "Self-serve onboarding teardown", "Fictional Guest E", "Ep. 140 (mock)"),
-    ],
+    sources: [],
     artifact: onboardingArtifact,
   },
   {
@@ -166,9 +146,7 @@ I've put together a checklist you can work through with your team.`,
 - 40%+ of surveyed users would be "very disappointed" without you (Sean Ellis test)
 
 Before raising, narrow your ICP until one segment shows these signals clearly. Breadth comes later.`,
-    sources: [
-      src("s6", "Finding fit in a narrow segment", "Fictional Guest F", "Ep. 64 (mock)", "31:20"),
-    ],
+    sources: [],
   },
 ];
 
@@ -181,7 +159,7 @@ export const FALLBACK_REPLY: MockReply = {
 3. Run small, fast experiments and double down on what moves it
 
 Try asking about *retention*, *pricing*, *onboarding*, or *product-market fit* to see richer sample answers.`,
-  sources: [src("s7", "Growth fundamentals", "Fictional Guest G", "Ep. 12 (mock)")],
+  sources: [],
 };
 
 const DAY = 86_400_000;

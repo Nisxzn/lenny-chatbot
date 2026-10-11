@@ -19,6 +19,7 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     conversation_id: uuid.UUID
+    conversation_title: Optional[str] = None
     user_message_id: uuid.UUID
     assistant_message_id: uuid.UUID
     response_text: str

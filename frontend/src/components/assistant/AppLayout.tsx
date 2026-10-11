@@ -11,6 +11,7 @@ import { LogoMark } from "./Logo";
 import { MessageComposer } from "./MessageComposer";
 import { ErrorState, LoadingState } from "./States";
 import { useAssistantStore } from "./store";
+import MorphOrb from "@/components/ui/ai-thinking-orb-and-input";
 
 function Welcome() {
   const { send } = useAssistantStore();
@@ -22,16 +23,16 @@ function Welcome() {
   const icons = [Target, ChartNoAxesCombined, Sprout, Layers3];
   const topics = ["Product-market fit", "Retention", "Onboarding", "Pricing"];
   return (
-    <div className="mx-auto flex w-full max-w-[680px] flex-col px-5 pt-12 pb-8 sm:px-8 sm:pt-20">
-      <LogoMark className="size-12" />
-      <p className="mt-7 text-sm text-muted-foreground">{greeting}</p>
-      <h2 className="mt-2 max-w-lg font-display text-[30px] leading-tight font-medium sm:text-4xl">
+    <div className="mx-auto flex w-full max-w-[800px] flex-col px-5 pt-12 pb-8 sm:px-8 sm:pt-20">
+      <LogoMark className="size-10" />
+      <p className="mt-6 font-mono text-[13px] text-muted-foreground">{greeting}</p>
+      <h2 className="mt-2 max-w-lg text-[29px] font-semibold tracking-tight text-foreground sm:text-[32px]">
         What growth challenge are we working on?
       </h2>
-      <p className="mt-4 max-w-md text-sm leading-relaxed text-muted-foreground">
+      <p className="mt-3 max-w-md text-[15px] sm:text-base leading-relaxed text-muted-foreground">
         A little clarity for your next big decision.
       </p>
-      <div className="mt-8 grid w-full gap-3 sm:grid-cols-2">
+      <div className="mt-8 grid w-full gap-2.5 sm:grid-cols-2">
         {STARTER_QUESTIONS.slice(0, 4).map((q, i) => {
           const Icon = icons[i] ?? Target;
           return (
@@ -39,14 +40,16 @@ function Welcome() {
               key={q}
               variant="outline"
               onClick={() => send(q)}
-              className="group h-auto min-h-28 flex-col items-start gap-3 whitespace-normal rounded-xl border-border/70 bg-card/60 p-4 text-left shadow-xs transition-all duration-200 hover:border-primary/45 hover:bg-card hover:shadow-sm"
+              className="group h-auto min-h-24 flex-col items-start gap-2.5 whitespace-normal rounded-xl border border-border bg-card/50 p-4 text-left shadow-2xs transition-colors hover:border-border hover:bg-card"
             >
-              <span className="flex w-full items-center gap-2 text-xs text-muted-foreground">
-                <Icon className="size-4 text-primary/80 transition-colors group-hover:text-primary" />
-                {topics[i]}
-                <ArrowUpRight className="ml-auto size-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
+              <span className="flex w-full items-center gap-2 text-[12.5px] text-muted-foreground">
+                <Icon className="size-3.5 text-muted-foreground transition-colors group-hover:text-foreground" />
+                <span>{topics[i]}</span>
+                <ArrowUpRight className="ml-auto size-3 opacity-0 transition-opacity group-hover:opacity-100" />
               </span>
-              <span className="text-sm font-normal leading-relaxed">{q}</span>
+              <span className="text-[13.5px] font-normal leading-relaxed text-foreground/90">
+                {q}
+              </span>
             </Button>
           );
         })}
@@ -59,9 +62,10 @@ function ChatWorkspace() {
   const { active, phase, error, retry, hydrated } = useAssistantStore();
   const end = useRef<HTMLDivElement>(null);
   const msgs = active?.messages ?? [];
+  const lastMsgContent = msgs[msgs.length - 1]?.content;
   useEffect(() => {
     end.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [msgs.length, msgs[msgs.length - 1]?.content, phase, error]);
+  }, [msgs.length, lastMsgContent, phase, error]);
 
   if (!hydrated)
     return (
@@ -71,11 +75,11 @@ function ChatWorkspace() {
     );
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain scroll-smooth">
+    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain scroll-smooth scrollbar-thin">
       {msgs.length === 0 ? (
         <Welcome />
       ) : (
-        <div className="mx-auto max-w-3xl space-y-8 px-5 py-8 sm:px-8">
+        <div className="mx-auto max-w-[800px] space-y-6 px-4 py-6 sm:px-6 sm:py-8 pb-10">
           {msgs.map((m) => (
             <ChatMessage key={m.id} message={m} />
           ))}
@@ -93,8 +97,11 @@ function ChatWorkspace() {
 }
 
 export function AppLayout() {
-  const { artifactOpen, setArtifactOpen, newChat } = useAssistantStore();
+  const { artifactOpen, setArtifactOpen, newChat, active, activeId, send, error, hydrated } =
+    useAssistantStore();
   const [narrow, setNarrow] = useState(false);
+  const [isMorphing, setIsMorphing] = useState(false);
+
   useEffect(() => {
     const media = window.matchMedia("(max-width: 1099px)");
     const update = () => setNarrow(media.matches);
@@ -102,13 +109,25 @@ export function AppLayout() {
     media.addEventListener("change", update);
     return () => media.removeEventListener("change", update);
   }, []);
+
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    setIsMorphing(false);
+  }, [activeId]);
+
+  useEffect(() => {
+    if (error) {
+      setIsMorphing(false);
+    }
+  }, [error]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
+        setIsMorphing(false);
         newChat();
       }
     };
@@ -116,24 +135,62 @@ export function AppLayout() {
     return () => window.removeEventListener("keydown", onKey);
   }, [newChat]);
 
+  const hasMessages = (active?.messages.length ?? 0) > 0;
+  const showMorphOrb = !hasMessages || isMorphing;
+
+  if (!hydrated) {
+    return (
+      <div className="flex h-dvh w-full items-center justify-center bg-background">
+        <LoadingState label="Loading workspace…" />
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-dvh w-full overflow-hidden bg-background">
       <div className="hidden md:block">
-        <ConversationSidebar collapsed={collapsed} />
+        <ConversationSidebar
+          collapsed={collapsed}
+          onToggleCollapse={() => setCollapsed((c) => !c)}
+        />
       </div>
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetContent side="left" className="w-72 p-0 [&>button]:hidden">
+        <SheetContent side="left" className="w-[290px] p-0 [&>button]:hidden">
           <SheetTitle className="sr-only">Conversations</SheetTitle>
           <ConversationSidebar collapsed={false} onNavigate={() => setMobileOpen(false)} />
         </SheetContent>
       </Sheet>
-      <main className="flex min-w-0 flex-1 flex-col">
-        <ChatHeader
-          onToggleSidebar={() => setCollapsed((c) => !c)}
-          onOpenMobileSidebar={() => setMobileOpen(true)}
-        />
-        <ChatWorkspace />
-        <MessageComposer />
+      <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
+        <ChatHeader onOpenMobileSidebar={() => setMobileOpen(true)} />
+        {showMorphOrb ? (
+          <div className="relative min-h-0 flex-1 w-full overflow-hidden">
+            <MorphOrb
+              onSubmit={(text) => {
+                setIsMorphing(true);
+                return new Promise<void>((resolve) => {
+                  let resolved = false;
+                  const onStart = () => {
+                    if (!resolved) {
+                      resolved = true;
+                      resolve();
+                    }
+                  };
+                  void send(text, onStart);
+                  // Safety timer: if response doesn't start in 12s, resolve anyway
+                  setTimeout(onStart, 12000);
+                });
+              }}
+              onTransition={() => {
+                setIsMorphing(false);
+              }}
+            />
+          </div>
+        ) : (
+          <>
+            <ChatWorkspace />
+            <MessageComposer />
+          </>
+        )}
       </main>
       {artifactOpen && !narrow && (
         <ArtifactViewer className="w-[43%] min-w-[380px] max-w-[720px] shrink-0 border-l border-border" />

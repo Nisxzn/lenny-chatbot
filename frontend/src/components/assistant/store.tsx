@@ -10,6 +10,7 @@ import {
 } from "react";
 import { api } from "@/services/api";
 import type { Artifact, Conversation, Message, ModelSelection, Source } from "@/types/assistant";
+import { generateConversationTitle } from "@/lib/conversations";
 import { toast } from "sonner";
 
 interface RawCitation {
@@ -24,18 +25,43 @@ interface RawCitation {
 }
 
 function mapRawCitations(rawList?: RawCitation[]): Source[] {
-  if (!rawList) return [];
-  return rawList.map((c, i) => ({
-    id: `citation-${i}-${c.timestamp || ""}`,
-    title: c.episode_title || c.title || "Lenny's Podcast",
-    guest: c.speaker || c.guest || "Lenny Rachitsky",
-    speaker: c.speaker,
-    episode: c.episode_title || c.episode || "Lenny's Podcast",
-    episode_title: c.episode_title,
-    timestamp: c.timestamp,
-    url: c.url,
-    content: c.content,
-  }));
+  if (!rawList || !Array.isArray(rawList)) return [];
+  return rawList
+    .filter((c) => {
+      if (!c) return false;
+      const title = (c.episode_title || c.title || "").trim();
+      const speaker = (c.speaker || c.guest || "").trim();
+      const lower = `${title} ${speaker}`.toLowerCase();
+
+      // Discard mock, fictional, or placeholder entries
+      if (
+        lower.includes("mock") ||
+        lower.includes("fictional") ||
+        title.toLowerCase() === "unknown" ||
+        title.toLowerCase() === "n/a"
+      ) {
+        return false;
+      }
+
+      // Must have an actual identifiable title or valid URL
+      return Boolean(title || c.url);
+    })
+    .map((c, i) => {
+      const title = (c.episode_title || c.title || "").trim();
+      const guest = (c.speaker || c.guest || "").trim();
+      return {
+        id: `citation-${i}-${c.timestamp || ""}`,
+        title,
+        guest,
+        speaker: c.speaker,
+        episode: (c.episode_title || c.episode || "").trim(),
+        episode_title: c.episode_title,
+        timestamp: c.timestamp,
+        url: c.url,
+        content: c.content,
+      };
+    })
+    .filter((s) => Boolean(s.title || s.url));
 }
 
 type Phase = "idle" | "loading" | "generating";
@@ -55,7 +81,7 @@ interface Store {
   select(id: string): void;
   rename(id: string, title: string): void;
   remove(id: string): void;
-  send(text: string): void;
+  send(text: string, onResponseStart?: () => void): Promise<void> | void;
   retry(): void;
   stop(): void;
   setModel(m: ModelSelection): void;
@@ -69,10 +95,18 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [model, setModelState] = useState<ModelSelection>({
-    provider: "ollama",
-    model: "qwen3:4b",
-    cloudProviderName: "OpenRouter",
+  const [model, setModelState] = useState<ModelSelection>(() => {
+    try {
+      const saved = localStorage.getItem("lenny_model_selection");
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // Ignore localStorage errors
+    }
+    return {
+      provider: "ollama",
+      model: "llama3:latest",
+      cloudProviderName: "OpenRouter",
+    };
   });
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -185,11 +219,24 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const run = useCallback(
-    async (convId: string | null, text: string, history: Message[]) => {
+    async (
+      convId: string | null,
+      text: string,
+      history: Message[],
+      onResponseStart?: () => void,
+    ) => {
       setError(null);
       setPhase("loading");
       const ctrl = new AbortController();
       abortRef.current = ctrl;
+
+      let hasStarted = false;
+      const notifyStart = () => {
+        if (!hasStarted) {
+          hasStarted = true;
+          onResponseStart?.();
+        }
+      };
 
       // optimistic user msg
       const userMsgId = Math.random().toString();
@@ -201,19 +248,30 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       };
 
       let currentConvId = convId;
+      const meaningfulTitle = generateConversationTitle(text);
 
       if (currentConvId && conversations.some((c) => c.id === currentConvId)) {
-        patch(currentConvId, (c) => ({
-          ...c,
-          messages: [...c.messages, optimisticMsg],
-        }));
+        patch(currentConvId, (c) => {
+          // If conversation still has placeholder or untitled title, update it immediately to meaningful title
+          const shouldUpdateTitle =
+            !c.title ||
+            c.title.trim().toLowerCase() === "new chat" ||
+            c.title.trim().toLowerCase() === "untitled" ||
+            c.messages.length === 0;
+
+          return {
+            ...c,
+            title: shouldUpdateTitle ? meaningfulTitle : c.title,
+            messages: [...c.messages, optimisticMsg],
+          };
+        });
       } else {
         // Create an optimistic local conversation if none exists
         const tempId = `conv-${Date.now()}`;
         currentConvId = tempId;
         const newConv: Conversation = {
           id: tempId,
-          title: text.slice(0, 30),
+          title: meaningfulTitle,
           updatedAt: Date.now(),
           messages: [optimisticMsg],
         };
@@ -230,11 +288,21 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
           signal: ctrl.signal,
         });
 
-        // If backend returned a new conversationId, sync it
+        // If backend returned a new conversationId or conversationTitle, sync it
         const finalConvId = res.conversationId || currentConvId;
-        if (finalConvId !== currentConvId) {
+        const finalTitle = res.conversationTitle || meaningfulTitle;
+
+        if (finalConvId !== currentConvId || res.conversationTitle) {
           setConversations((l) =>
-            l.map((c) => (c.id === currentConvId ? { ...c, id: finalConvId } : c)),
+            l.map((c) =>
+              c.id === currentConvId
+                ? {
+                    ...c,
+                    id: finalConvId,
+                    title: res.conversationTitle || c.title || finalTitle,
+                  }
+                : c,
+            ),
           );
           setActiveId(finalConvId);
           currentConvId = finalConvId;
@@ -251,6 +319,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
               id: msgId,
               role: "assistant",
               content: "",
+              status: "generating",
               statusMsg: "Preparing your question...",
               createdAt: Date.now(),
               sources: res.sources,
@@ -261,12 +330,13 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
 
         for await (const chunk of res.stream) {
           if (typeof chunk === "string") {
+            notifyStart();
             // Fallback for non-streaming strings
             patch(currentConvId, (c) => ({
               ...c,
               updatedAt: Date.now(),
               messages: c.messages.map((m) =>
-                m.id === msgId ? { ...m, content: m.content + chunk } : m,
+                m.id === msgId ? { ...m, content: m.content + chunk, status: "generating" } : m,
               ),
             }));
           } else if (chunk.type === "init") {
@@ -274,6 +344,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
             patch(currentConvId, (c) => ({
               ...c,
               id: chunk.conversationId || c.id,
+              title: chunk.conversationTitle || c.title,
               messages: c.messages.map((m) =>
                 m.id === msgId ? { ...m, sources: mappedSources } : m,
               ),
@@ -281,7 +352,13 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
             if (chunk.conversationId && chunk.conversationId !== currentConvId) {
               setConversations((l) =>
                 l.map((conv) =>
-                  conv.id === currentConvId ? { ...conv, id: chunk.conversationId } : conv,
+                  conv.id === currentConvId
+                    ? {
+                        ...conv,
+                        id: chunk.conversationId,
+                        title: chunk.conversationTitle || conv.title,
+                      }
+                    : conv,
                 ),
               );
               setActiveId(chunk.conversationId);
@@ -294,15 +371,68 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
                 m.id === msgId ? { ...m, statusMsg: chunk.message } : m,
               ),
             }));
-          } else if (chunk.type === "text_delta") {
+          } else if (chunk.type === "think_start") {
+            notifyStart();
+            patch(currentConvId, (c) => ({
+              ...c,
+              messages: c.messages.map((m) =>
+                m.id === msgId
+                  ? { ...m, statusMsg: "Thinking...", thinking: m.thinking || "" }
+                  : m,
+              ),
+            }));
+          } else if (chunk.type === "think_delta") {
+            notifyStart();
             patch(currentConvId, (c) => ({
               ...c,
               updatedAt: Date.now(),
               messages: c.messages.map((m) =>
-                m.id === msgId ? { ...m, content: m.content + chunk.text } : m,
+                m.id === msgId
+                  ? { ...m, thinking: (m.thinking || "") + chunk.text }
+                  : m,
               ),
             }));
+          } else if (chunk.type === "think_end") {
+            notifyStart();
+            patch(currentConvId, (c) => ({
+              ...c,
+              messages: c.messages.map((m) =>
+                m.id === msgId
+                  ? { ...m, statusMsg: "Generating your answer..." }
+                  : m,
+              ),
+            }));
+          } else if (chunk.type === "text_delta") {
+            notifyStart();
+            patch(currentConvId, (c) => ({
+              ...c,
+              updatedAt: Date.now(),
+              messages: c.messages.map((m) =>
+                m.id === msgId
+                  ? { ...m, content: m.content + chunk.text, status: "generating" }
+                  : m,
+              ),
+            }));
+          } else if (chunk.type === "error") {
+            notifyStart();
+            patch(currentConvId, (c) => ({
+              ...c,
+              messages: c.messages.map((m) =>
+                m.id === msgId
+                  ? {
+                      ...m,
+                      status: "error",
+                      statusMsg: undefined,
+                      content:
+                        m.content || `Error: ${chunk.message || "Failed to generate response."}`,
+                    }
+                  : m,
+              ),
+            }));
+            setError(chunk.message || "Something went wrong.");
+            toast.error(chunk.message || "Something went wrong.");
           } else if (chunk.type === "done") {
+            notifyStart();
             const mappedSources = mapRawCitations(chunk.data.citations);
             const rawArt = chunk.data.artifacts?.[0];
             const art: Artifact | undefined = rawArt
@@ -316,19 +446,24 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
 
             patch(currentConvId, (c) => ({
               ...c,
-              messages: c.messages.map((m) =>
-                m.id === msgId
-                  ? {
-                      ...m,
-                      id: chunk.data.id || msgId,
-                      content: chunk.data.content || m.content,
-                      statusMsg: undefined,
-                      status: "done",
-                      artifact: art,
-                      sources: mappedSources.length > 0 ? mappedSources : m.sources,
-                    }
-                  : m,
-              ),
+              title: chunk.data?.conversationTitle || c.title,
+              messages: c.messages.map((m) => {
+                if (m.id !== msgId) return m;
+                const finalContent = art
+                  ? (chunk.data?.content?.trim() || `I've created the **${art.title}** document for you.`)
+                  : (m.content && m.content.trim().length > (chunk.data?.content?.trim().length || 0)
+                      ? m.content
+                      : chunk.data?.content || m.content);
+                return {
+                  ...m,
+                  id: chunk.data.id || msgId,
+                  content: finalContent,
+                  statusMsg: undefined,
+                  status: "done",
+                  artifact: art,
+                  sources: mappedSources.length > 0 ? mappedSources : m.sources,
+                };
+              }),
             }));
             if (art) {
               setArtifact(art);
@@ -342,17 +477,25 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         patch(currentConvId, (c) => ({
           ...c,
           messages: c.messages.map((m) =>
-            m.id === msgId ? { ...m, status: "done", statusMsg: undefined } : m,
+            m.id === msgId
+              ? {
+                  ...m,
+                  status: m.status === "error" ? "error" : "done",
+                  statusMsg: undefined,
+                }
+              : m,
           ),
         }));
 
         // The artifact is now updated through the "done" event in the stream
       } catch (e) {
+        notifyStart();
         if ((e as Error).name !== "AbortError") {
           setError((e as Error).message || "Something went wrong.");
           toast.error((e as Error).message || "Something went wrong.");
         }
       } finally {
+        notifyStart();
         setPhase("idle");
         abortRef.current = null;
       }
@@ -376,9 +519,9 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   }, [stop]);
 
   const send = useCallback(
-    (raw: string) => {
+    (raw: string, onResponseStart?: () => void): Promise<void> => {
       const text = raw.trim();
-      if (!text || phase !== "idle") return;
+      if (!text || phase !== "idle") return Promise.resolve();
       lastPrompt.current = text;
       const id = activeId;
       let history: Message[] = [];
@@ -387,7 +530,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         const cur = conversations.find((c) => c.id === id);
         history = cur?.messages ?? [];
       }
-      void run(id, text, history);
+      return run(id, text, history, onResponseStart);
     },
     [activeId, conversations, phase, run],
   );
@@ -418,9 +561,16 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         setArtifacts([]);
         setArtifactOpen(false);
       },
-      rename: (id, title) => {
-        // The backend does not currently support rename, just stub it with error message.
-        toast.error("Rename not supported by backend yet.");
+      rename: async (id, title) => {
+        const nextTitle = title.trim();
+        if (!nextTitle) return;
+        // Optimistically update
+        patch(id, (c) => ({ ...c, title: nextTitle }));
+        try {
+          await api.renameConversation(id, nextTitle);
+        } catch (e) {
+          toast.error("Failed to rename conversation.");
+        }
       },
       remove: async (id) => {
         try {
@@ -446,6 +596,11 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       stop,
       setModel: (m) => {
         setModelState(m);
+        try {
+          localStorage.setItem("lenny_model_selection", JSON.stringify(m));
+        } catch {
+          // Ignore localStorage write error
+        }
       },
       openArtifact: async (a) => {
         // ensure we have content

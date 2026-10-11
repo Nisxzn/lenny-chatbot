@@ -1,95 +1,164 @@
-import { Button } from "@/components/ui/button";
-import { ArrowUp, Square } from "lucide-react";
+import { Square } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useAssistantStore } from "./store";
+import { ModelSelector } from "./ModelSelector";
+import "@/components/ui/ai-thinking-orb-and-input.css";
 
 export function MessageComposer() {
   const { send, phase, stop, activeId, model, error } = useAssistantStore();
   const [value, setValue] = useState("");
+  const [isMultiline, setIsMultiline] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const timers = useRef<{ typing?: number; shake?: number }>({});
   const busy = phase !== "idle";
 
   useEffect(() => {
     ref.current?.focus();
   }, [activeId, phase]);
+
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, 200) + "px";
+    const nextH = Math.min(el.scrollHeight, 180);
+    el.style.height = nextH + "px";
+    setIsMultiline(nextH > 44);
   }, [value]);
 
+  useEffect(() => {
+    const currentTimers = timers.current;
+    return () => {
+      window.clearTimeout(currentTimers.typing);
+      window.clearTimeout(currentTimers.shake);
+    };
+  }, []);
+
+  const shake = () => {
+    const box = boxRef.current;
+    if (!box) return;
+    box.removeAttribute("data-shake");
+    void box.offsetWidth;
+    box.setAttribute("data-shake", "");
+    window.clearTimeout(timers.current.shake);
+    timers.current.shake = window.setTimeout(() => box.removeAttribute("data-shake"), 260);
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setValue(e.target.value);
+    const box = boxRef.current;
+    if (box) {
+      box.setAttribute("data-typing", "");
+      window.clearTimeout(timers.current.typing);
+      timers.current.typing = window.setTimeout(() => box.removeAttribute("data-typing"), 300);
+    }
+  };
+
   const submit = () => {
-    if (!value.trim() || busy) return;
-    send(value);
+    if (busy) return;
+    const text = value.trim();
+    if (!text) {
+      shake();
+      return;
+    }
+    send(text);
     setValue("");
   };
 
+  const ready = value.trim().length > 0;
+
   return (
-    <div className="mx-auto w-full max-w-3xl shrink-0 px-4 pt-3 pb-4 sm:px-8">
-      <div className="rounded-2xl border border-border/80 bg-card/90 shadow-workspace transition-all duration-200 focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/20">
-        <label htmlFor="composer" className="sr-only">
-          Message
-        </label>
-        <textarea
-          id="composer"
-          ref={ref}
-          rows={1}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              submit();
-            }
-          }}
-          placeholder="Ask about growth, retention, pricing…"
-          className="block w-full resize-none bg-transparent px-4 pt-4 pb-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
-        />
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-4 pb-3">
-          <span className="min-w-0 text-[11px] text-muted-foreground">
-            <kbd className="font-mono">Enter</kbd> to send ·{" "}
-            <kbd className="font-mono">Shift+Enter</kbd> new line
-          </span>
-          {busy ? (
-            <Button
-              size="icon"
-              onClick={stop}
-              title="Stop generating"
-              aria-label="Stop generating"
-              className="flex size-8 items-center justify-center rounded-lg bg-foreground text-background transition-transform active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    <div className="mx-auto w-full max-w-[800px] shrink-0 px-4 pt-2 pb-5 sm:px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+      {error && (
+        <p className="mb-2 text-center text-xs font-medium text-destructive">{error}</p>
+      )}
+      <div className="mo-composer-root">
+        <div ref={boxRef} className={`mo-composer-box ${isMultiline ? "mo-multiline" : ""}`}>
+          <div className="mo-composer-underglow" aria-hidden="true" />
+          <div className="mo-composer-surface" aria-hidden="true">
+            <div className="mo-composer-aurora">
+              <i />
+              <i />
+              <i />
+              <i />
+            </div>
+          </div>
+          <div className="mo-composer-ring" aria-hidden="true" />
+
+          <div className="mo-composer-row">
+            <svg
+              className="mo-composer-spark"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
             >
-              <Square className="size-3 fill-current" />
-            </Button>
-          ) : (
-            <Button
-              size="icon"
-              onClick={submit}
-              title="Send message"
-              disabled={!value.trim()}
-              aria-label="Send message"
-              className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs transition-all hover:bg-primary/90 active:scale-95 disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <ArrowUp className="size-4" />
-            </Button>
-          )}
+              <path d="M10 3.5l1.7 4.8 4.8 1.7-4.8 1.7L10 16.5l-1.7-4.8L3.5 10l4.8-1.7L10 3.5z" />
+              <path d="M18 14.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7.7-1.8z" />
+            </svg>
+
+            <label htmlFor="composer" className="sr-only">
+              Ask anything
+            </label>
+            <textarea
+              id="composer"
+              ref={ref}
+              rows={1}
+              value={value}
+              onChange={handleChange}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  submit();
+                }
+              }}
+              placeholder="Ask anything about growth, retention, pricing…"
+              className="mo-composer-field"
+            />
+
+            <div className="mo-composer-actions">
+              <ModelSelector variant="composer" />
+              {busy ? (
+                <button
+                  type="button"
+                  onClick={stop}
+                  title="Stop generating"
+                  aria-label="Stop generating"
+                  className="mo-composer-btn mo-composer-stop"
+                >
+                  <Square className="size-3.5 fill-current" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={submit}
+                  title="Send message"
+                  aria-label="Send message"
+                  data-ready={ready ? "" : undefined}
+                  disabled={!ready}
+                  className="mo-composer-btn"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M12 19V5" />
+                    <path d="M5.5 11.5L12 5l6.5 6.5" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
-      <p className="mt-3 text-center text-[10px] sm:text-[11px] text-muted-foreground">
-        {error ? (
-          <span className="text-destructive font-medium">{error}</span>
-        ) : (
-          <span className="inline-flex items-center gap-1.5">
-            <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span>
-              Connected to{" "}
-              {model.provider === "ollama"
-                ? "Local (Ollama)"
-                : `Cloud (${model.cloudProviderName})`}
-            </span>
-          </span>
-        )}
-      </p>
     </div>
   );
 }

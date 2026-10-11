@@ -25,10 +25,11 @@ export interface Message {
   id: string;
   role: Role;
   content: string;
+  thinking?: string;
   createdAt: number;
   sources?: Source[] | undefined;
   artifact?: Artifact | undefined;
-  status?: "done" | "error";
+  status?: "generating" | "done" | "error";
   statusMsg?: string;
 }
 

@@ -72,19 +72,113 @@ def _parse_attributes(tag_str: str) -> Dict[str, str]:
     return attrs
 
 
+def _clean_thinking(text: str) -> str:
+    """Removes internal thinking tokens (<think>...</think> or ...</think>) from text."""
+    if not text:
+        return ""
+    # Strip explicit <think>...</think>
+    cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+    # Strip unclosed <think>... at start or within text
+    if "<think>" in cleaned and "</think>" not in cleaned:
+        cleaned = re.sub(r'<think>.*$', '', cleaned, flags=re.DOTALL)
+    # Strip leading ...</think> (e.g. models where opening tag is implicit)
+    cleaned = re.sub(r'^.*?</think>', '', cleaned, flags=re.DOTALL)
+    return cleaned.strip()
+
+
+def _infer_artifact_title(response_text: str, user_request: Optional[str] = None) -> str:
+    """Infers an informative, presentation-ready title for the generated artifact."""
+    clean_text = _clean_thinking(response_text)
+    lines = clean_text.strip().splitlines()
+    for line in lines[:10]:
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            candidate = stripped.lstrip("#").strip()
+            if candidate and len(candidate) <= 80:
+                return candidate
+
+    if user_request:
+        cleaned_req = user_request.strip().rstrip("?.! ")
+        req_lower = cleaned_req.lower()
+
+        prefixes = [
+            "can you please summarize", "please summarize", "can you summarize", "summarize",
+            "can you please explain", "please explain", "can you explain", "explain",
+            "what is", "what are", "tell me about", "give me a summary of", "give a summary of",
+            "write an essay on", "write an essay about", "write an article about",
+            "draft an essay on", "deep dive into", "break down", "overview of"
+        ]
+        for prefix in prefixes:
+            if req_lower.startswith(prefix):
+                subject = cleaned_req[len(prefix):].strip()
+                if subject:
+                    if "summar" in prefix:
+                        return f"Summary: {subject.title()}"
+                    elif any(p in prefix for p in ["explain", "deep dive", "break down", "what is", "what are"]):
+                        return f"Explanation: {subject.title()}"
+                    elif any(p in prefix for p in ["essay", "article", "draft"]):
+                        return f"Essay: {subject.title()}"
+                    return subject.title()
+
+        if len(cleaned_req) <= 60:
+            return cleaned_req.title()
+
+    return "Executive Summary & Insights"
+
+
+def generate_conversation_title(prompt: str) -> str:
+    """
+    Generates a concise, meaningful title (3-6 words, <= 50 chars) from a user query,
+    similar to how ChatGPT and Claude format conversation titles, rather than using raw prompts.
+    """
+    if not prompt or not prompt.strip():
+        return "New Chat"
+
+    cleaned = prompt.strip().rstrip("?.! ")
+    # Remove leading quotes or markdown symbols
+    cleaned = re.sub(r'^["\'`*#]+|["\'`*#]+$', '', cleaned).strip()
+
+    # Common conversational / filler prefixes
+    lead_patterns = [
+        r"^(?:hey|hi|hello|please|can\s+you\s+(?:please\s+)?(?:tell\s+me|explain|summarize|write|give\s+me|help\s+me\s+with)?)\s+",
+        r"^(?:could\s+you\s+(?:please\s+)?(?:tell\s+me|explain|summarize|write|give\s+me|help\s+me\s+with)?)\s+",
+        r"^(?:what\s+(?:is|are|do\s+you\s+think\s+about|does\s+it\s+mean\s+by|would\s+be))\s+",
+        r"^(?:how\s+(?:do|to|can|should|would)\s+(?:i|we|you)?)\s+",
+        r"^(?:tell\s+me\s+(?:about|more\s+about))\s+",
+        r"^(?:explain\s+(?:to\s+me\s+)?(?:about)?)\s+",
+        r"^(?:summarize\s+(?:about)?)\s+",
+        r"^(?:give\s+me\s+(?:a|an)?\s*(?:overview\s+of|breakdown\s+of|summary\s+of)?)\s+",
+        r"^(?:write\s+(?:a|an)?\s*(?:essay|article|post|guide|checklist)?\s*(?:on|about)?)\s+",
+        r"^(?:i\s+want\s+to\s+know\s+about)\s+",
+        r"^(?:i\'m\s+looking\s+for)\s+",
+    ]
+    sub = cleaned
+    for pattern in lead_patterns:
+        sub = re.sub(pattern, "", sub, flags=re.IGNORECASE).strip()
+
+    # If stripped empty, fallback to cleaned
+    candidate = sub if len(sub) >= 3 else cleaned
+
+    # Take first 4 to 6 words
+    words = candidate.split()
+    if len(words) > 6:
+        candidate = " ".join(words[:6])
+
+    # Capitalize appropriately (Title Case)
+    title = candidate.title()
+
+    # Truncate to 48 chars gracefully if still long
+    if len(title) > 48:
+        title = title[:45].rsplit(" ", 1)[0] + "…"
+
+    return title or "Growth Strategy"
+
+
 def extract_artifacts(response_text: str, user_request: Optional[str] = None) -> Tuple[str, List[Dict[str, str]]]:
     """
     Parses the response text to find <artifact> blocks reliably.
-    Handles:
-    - Any attribute ordering (e.g. title first or type first).
-    - Unquoted, single-quoted, and double-quoted attribute values.
-    - Multiline markdown, code blocks, tables, and HTML.
-    - Malformed or unclosed <artifact> blocks without losing content.
-    - Missing <artifact> blocks when a document was requested and returned as structured markdown.
-    - Preserves normal conversational responses.
-    
-    Returns:
-        (cleaned_response_text, list_of_artifacts)
+    If the user asked to summarize, explain, essay, or the response is large,
+    generates an artifact without fail even if the model omitted explicit XML tags.
     """
     if not response_text:
         return "", []
@@ -105,7 +199,6 @@ def extract_artifacts(response_text: str, user_request: Optional[str] = None) ->
             start_open = open_match.start()
             end_open = open_match.end()
             
-            # Text before this artifact
             if start_open > last_idx:
                 segments.append(response_text[last_idx:start_open])
             
@@ -118,27 +211,25 @@ def extract_artifacts(response_text: str, user_request: Optional[str] = None) ->
                 
             title = attrs.get("title", "").strip()
 
-            # Find matching close tag after end_open
             close_match = close_tag_pattern.search(response_text, end_open)
-            
-            # Check if there is another open tag before this close tag (in case of unclosed tags)
             next_open = open_matches[i + 1].start() if i + 1 < len(open_matches) else len(response_text)
             
             if close_match and close_match.start() < next_open:
                 content = response_text[end_open:close_match.start()].strip()
                 last_idx = close_match.end()
             else:
-                # Unclosed artifact tag: take content until next artifact tag or end of text
                 content = response_text[end_open:next_open].strip()
                 last_idx = next_open
 
-            # If title was not in attributes, infer from first heading
+            # Clean any internal thinking tokens from artifact content
+            content = _clean_thinking(content)
+
             if not title:
                 heading_match = re.search(r'^#+\s*(.+)$', content, re.MULTILINE)
                 if heading_match:
                     title = heading_match.group(1).strip()
                 else:
-                    title = "Generated Document"
+                    title = _infer_artifact_title(content, user_request)
 
             artifacts.append({
                 "type": artifact_type,
@@ -152,11 +243,8 @@ def extract_artifacts(response_text: str, user_request: Optional[str] = None) ->
             segments.append(response_text[last_idx:])
             
         cleaned_text = "".join(segments).strip()
-        
-        # If the cleaned text is only placeholder or empty, provide a clean intro
-        if not cleaned_text or cleaned_text.startswith("*[Generated Artifact:"):
-            first_title = artifacts[0]["title"] if artifacts else "Document"
-            cleaned_text = f"I've generated the requested document for you:\n\n*[Generated Artifact: {first_title}]*"
+        if not cleaned_text and artifacts:
+            cleaned_text = f"I've created the **{artifacts[0]['title']}** document for you. You can review the complete document in the artifact panel.\n\n*[Generated Artifact: {artifacts[0]['title']}]*"
 
         return cleaned_text, artifacts
 
@@ -169,65 +257,99 @@ def extract_artifacts(response_text: str, user_request: Optional[str] = None) ->
         attrs = _parse_attributes(attr_part)
         
         artifact_type = attrs.get("type", "").lower() or "markdown"
-        title = attrs.get("title", "").strip() or "Generated Document"
+        title = attrs.get("title", "").strip() or _infer_artifact_title(response_text, user_request)
         
-        # Content is after the opening pattern
         after_open = response_text[malformed_open.end():].lstrip(">").strip()
-        # Remove any stray closing tag
         content = re.sub(r'</\s*artifact\s*>', '', after_open, flags=re.IGNORECASE).strip()
+        content = _clean_thinking(content)
         
         if content:
-            if title == "Generated Document":
-                heading_match = re.search(r'^#+\s*(.+)$', content, re.MULTILINE)
-                if heading_match:
-                    title = heading_match.group(1).strip()
-
             artifacts.append({
                 "type": artifact_type if artifact_type in ["markdown", "html", "text"] else "markdown",
                 "title": title,
                 "content": content
             })
-            cleaned_text = f"{before_text}\n\n*[Generated Artifact: {title}]*".strip()
+            cleaned_text = f"{before_text}\n\n*[Generated Artifact: {title}]*".strip() if before_text else f"*[Generated Artifact: {title}]*"
             return cleaned_text, artifacts
 
-    # 3. Fallback: If user request or content clearly indicates a full essay/document was requested
-    # and the model returned an essay (e.g. structured with markdown headings and substantial length)
-    is_essay_request = False
-    if user_request:
-        req_lower = user_request.lower()
-        is_essay_request = any(kw in req_lower for kw in ["essay", "write an essay", "article", "draft a", "create a document", "1,250", "1250"])
+    # 3. Fallback: If user request specifically asked for an artifact/essay/document/summary,
+    # or the response is a comprehensive structured document with headers.
+    # NEVER create an artifact for greetings, short questions, or conversational chat!
+    req_lower = (user_request or "").strip().lower()
+    
+    # Check if this is a simple greeting or brief question
+    greeting_words = {"hi", "hello", "hey", "hiya", "howdy", "sup", "yo", "greetings"}
+    req_tokens = re.sub(r"[^\w\s]", "", req_lower).split()
+    is_simple_greeting = (
+        len(req_tokens) <= 3 and any(w in greeting_words for w in req_tokens)
+    ) or req_lower in [
+        "how are you", "how are you doing", "who are you", "what can you do", "help"
+    ]
+    if is_simple_greeting:
+        return response_text.strip(), []
 
-    lines = response_text.strip().splitlines()
-    has_top_heading = any(line.strip().startswith("# ") for line in lines[:10])
-    word_count = len(response_text.split())
+    is_summarize = any(kw in req_lower for kw in [
+        "summariz", "summary", "summarise", "brief", "digest", "overview",
+        "recap", "takeaway", "takeaways", "key points", "tl;dr", "tldr", "synopsis"
+    ])
+    is_essay = any(kw in req_lower for kw in [
+        "essay", "article", "draft", "create a document", "write a post",
+        "guide", "checklist", "playbook", "framework", "roadmap",
+        "1,250", "1250", "write up", "write-up", "create an artifact", "generate an artifact"
+    ])
+    is_writing_intent = is_summarize or is_essay
 
-    if (is_essay_request and (has_top_heading or word_count >= 50)) or (has_top_heading and word_count >= 150):
-        # Extract title from the first `# ` heading
-        title = "Generated Essay"
-        doc_start_idx = 0
-        for i, line in enumerate(lines):
-            if line.strip().startswith("# "):
-                title = line.strip().lstrip("#").strip()
-                doc_start_idx = i
-                break
-        
-        convo_intro = "\n".join(lines[:doc_start_idx]).strip()
-        doc_content = "\n".join(lines[doc_start_idx:]).strip()
-        if not doc_content:
-            doc_content = response_text.strip()
-            convo_intro = ""
+    clean_resp = _clean_thinking(response_text)
+    lines = clean_resp.strip().splitlines()
+    has_top_heading = any(line.strip().startswith("#") for line in lines[:10])
+    has_list_items = any(re.match(r'^\s*[-*•\d+\.]', line) for line in lines)
+    words = clean_resp.split()
+    word_count = len(words)
+    char_count = len(clean_resp)
+    # Goal threshold for large responses:
+    # Set response length as goal: When the response touches the goal length, create an artifact for it!
+    # A response is considered large when word_count >= 120 or char_count >= 600
+    RESPONSE_LENGTH_GOAL_WORDS = 120
+    RESPONSE_LENGTH_GOAL_CHARS = 600
+
+    is_large_response = (
+        word_count >= RESPONSE_LENGTH_GOAL_WORDS
+        or char_count >= RESPONSE_LENGTH_GOAL_CHARS
+        or (has_top_heading and word_count >= 60)
+    )
+
+    should_create_artifact = (
+        (is_writing_intent and word_count >= 25)
+        or is_large_response
+    )
+
+    if should_create_artifact and word_count >= 15:
+        title = _infer_artifact_title(clean_resp, user_request)
+
+        artifact_type = "markdown"
+        if "<html" in clean_resp.lower() or "<!doctype html" in clean_resp.lower():
+            artifact_type = "html"
 
         artifacts.append({
-            "type": "markdown",
+            "type": artifact_type,
             "title": title,
-            "content": doc_content
+            "content": clean_resp.strip()
         })
-        
-        cleaned_text = f"{convo_intro}\n\n*[Generated Artifact: {title}]*".strip()
-        if not convo_intro:
-            cleaned_text = f"I've generated the requested document for you:\n\n*[Generated Artifact: {title}]*"
-            
+
+        # Do NOT write the entire artifact content in the chat conversation screen!
+        # Show concise common text in the conversation, and display the artifact in its dedicated panel.
+        intro_lines = []
+        for line in lines:
+            if line.strip().startswith("#"):
+                break
+            intro_lines.append(line)
+        intro_text = "\n".join(intro_lines).strip()
+
+        common_notice = f"I've created the **{title}** document for you. You can review the complete document in the artifact panel."
+        if intro_text and 3 <= len(intro_text.split()) < 60:
+            cleaned_text = f"{intro_text}\n\n{common_notice}\n\n*[Generated Artifact: {title}]*"
+        else:
+            cleaned_text = f"{common_notice}\n\n*[Generated Artifact: {title}]*"
         return cleaned_text, artifacts
 
-    # Normal conversational response without artifacts
     return response_text.strip(), []
