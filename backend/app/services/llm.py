@@ -74,17 +74,8 @@ def check_native_tool_support(provider_type: str, model: str, base_url: str = ""
 
 def is_writing_request(text: str) -> bool:
     """Detects whether a user prompt requests creating a formal essay, document, or artifact."""
-    if not text:
-        return False
-    t = text.lower()
-    writing_keywords = [
-        "essay", "write an essay", "article", "write an article",
-        "draft a", "create a document", "write a guide", "create a guide",
-        "checklist", "ship 30", "1,250", "1250", "write a blog",
-        "create an html", "write html", "generate artifact", "create artifact",
-        "produce an artifact", "writing skill"
-    ]
-    return any(kw in t for kw in writing_keywords)
+    from app.services.writing import is_artifact_requested
+    return is_artifact_requested(text)
 
 class OllamaCompatibleProvider(OpenAIProvider):
     """
@@ -115,7 +106,7 @@ class OllamaCompatibleProvider(OpenAIProvider):
         extra_body["keep_alive"] = "1h"
         extra_body["options"] = {
             "num_predict": self.max_tokens or 768,
-            "num_ctx": 2048,
+            "num_ctx": 1800,
             "temperature": 0.6,
             "top_p": 0.9,
         }
@@ -261,6 +252,8 @@ class PiFrameworkProvider(LLMProvider):
             self.display_provider = "local (ollama)"
             
     def generate_response(self, system_prompt: str, messages: List[Dict[str, str]]) -> Tuple[str, str, str]:
+        if self.provider_type == "local":
+            system_prompt = system_prompt + "\n\nAnswer directly and concisely. Do NOT generate internal thinking tokens or <think> blocks."
         agent_init_start = time.perf_counter()
         from app.services.writing import writing_tool
         config = AgentConfig(system_prompt=system_prompt)
@@ -315,6 +308,8 @@ class PiFrameworkProvider(LLMProvider):
         return response_text, self.display_provider, self.model
 
     def generate_streamed_response(self, system_prompt: str, messages: List[Dict[str, str]], on_event: callable) -> Tuple[str, str, str]:
+        if self.provider_type == "local":
+            system_prompt = system_prompt + "\n\nAnswer directly and concisely. Do NOT generate internal thinking tokens or <think> blocks."
         agent_init_start = time.perf_counter()
         from app.services.writing import writing_tool
         config = AgentConfig(system_prompt=system_prompt, stream=True)

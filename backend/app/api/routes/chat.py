@@ -195,6 +195,8 @@ def chat_endpoint(req: ChatRequest, db: Session = Depends(get_db)):
     is_writing = is_writing_request(req.message)
     is_greeting = is_greeting_or_meta_query(req.message)
     effective_system_prompt = SYSTEM_PROMPT if is_writing else BASE_SYSTEM_PROMPT
+    if req.provider in ["local", "ollama"]:
+        effective_system_prompt += "\n\nAnswer directly and concisely. Do NOT generate internal thinking tokens or <think> blocks."
 
     direct_hint = "" if is_writing else "\n\n(Important: Answer directly and concisely. Do NOT output <think> or internal reasoning tags.)"
     if is_greeting:

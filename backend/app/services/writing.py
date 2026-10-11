@@ -30,7 +30,7 @@ If asked to write an essay:
 
 CONVERSATIONAL COMPANION:
 Provide a brief, helpful conversational introduction outside the artifact block explaining what you have created.
-Do NOT output the `<artifact>` block for simple questions or short conversational chat responses; only use it when a substantial document, essay, guide, or page is requested.
+Do NOT output the `<artifact>` block for simple questions or conversational chat responses; only use it when the user explicitly asks for a document, essay, guide, page, or artifact, or when the response exceeds 900+ words.
 """
 
 def create_artifact_handler(args: dict, sandbox) -> str:
@@ -174,14 +174,62 @@ def generate_conversation_title(prompt: str) -> str:
     return title or "Growth Strategy"
 
 
+def is_artifact_requested(user_request: Optional[str]) -> bool:
+    """
+    Checks if the user explicitly asked for an artifact, essay, article,
+    document, guide, checklist, playbook, framework, or HTML document.
+    """
+    if not user_request:
+        return False
+    req_lower = user_request.strip().lower()
+
+    artifact_keywords = [
+        "artifact",
+        "essay",
+        "article",
+        "create a document",
+        "generate a document",
+        "write a document",
+        "draft a document",
+        "make a document",
+        "create document",
+        "generate document",
+        "write document",
+        "draft document",
+        "make document",
+        "guide",
+        "checklist",
+        "playbook",
+        "framework",
+        "1,250",
+        "1250",
+        "write up",
+        "write-up",
+        "create an html",
+        "generate an html",
+        "write html",
+        "html page",
+        "html document",
+        "ship 30",
+        "writing skill"
+    ]
+    return any(kw in req_lower for kw in artifact_keywords)
+
+
 def extract_artifacts(response_text: str, user_request: Optional[str] = None) -> Tuple[str, List[Dict[str, str]]]:
     """
-    Parses the response text to find <artifact> blocks reliably.
-    If the user asked to summarize, explain, essay, or the response is large,
-    generates an artifact without fail even if the model omitted explicit XML tags.
+    Parses the response text to find <artifact> blocks.
+    Artifacts are generated ONLY when explicitly requested by the user
+    or when the response exceeds 900+ words.
+    Simple responses and conversational queries remain normal chat messages without artifacts.
     """
     if not response_text:
         return "", []
+
+    is_asked = is_artifact_requested(user_request)
+    clean_resp_text = _clean_thinking(response_text)
+    total_words = len(clean_resp_text.split())
+    is_over_900 = total_words >= 900
 
     artifacts: List[Dict[str, str]] = []
     
@@ -195,6 +243,12 @@ def extract_artifacts(response_text: str, user_request: Optional[str] = None) ->
     open_matches = list(open_tag_pattern.finditer(response_text))
     
     if open_matches:
+        # If user provided a query, but did NOT ask for an artifact and response is under 900 words,
+        # unwrap the tags so the content displays cleanly in chat as a simple response.
+        if user_request is not None and not is_asked and not is_over_900:
+            unwrapped = re.sub(r'</?\s*artifact\b[^>]*>', '', response_text, flags=re.IGNORECASE).strip()
+            return _clean_thinking(unwrapped), []
+
         for i, open_match in enumerate(open_matches):
             start_open = open_match.start()
             end_open = open_match.end()
@@ -251,6 +305,10 @@ def extract_artifacts(response_text: str, user_request: Optional[str] = None) ->
     # 2. Check for malformed opening tag e.g. `<artifact ...` without `>`
     malformed_open = re.search(r'<artifact\b([^>\n]*)', response_text, re.IGNORECASE)
     if malformed_open:
+        if user_request is not None and not is_asked and not is_over_900:
+            unwrapped = re.sub(r'<artifact\b[^>\n]*>?|</\s*artifact\s*>', '', response_text, flags=re.IGNORECASE).strip()
+            return _clean_thinking(unwrapped), []
+
         start_idx = malformed_open.start()
         before_text = response_text[:start_idx].strip()
         attr_part = malformed_open.group(1)
@@ -272,58 +330,14 @@ def extract_artifacts(response_text: str, user_request: Optional[str] = None) ->
             cleaned_text = f"{before_text}\n\n*[Generated Artifact: {title}]*".strip() if before_text else f"*[Generated Artifact: {title}]*"
             return cleaned_text, artifacts
 
-    # 3. Fallback: If user request specifically asked for an artifact/essay/document/summary,
-    # or the response is a comprehensive structured document with headers.
-    # NEVER create an artifact for greetings, short questions, or conversational chat!
-    req_lower = (user_request or "").strip().lower()
-    
-    # Check if this is a simple greeting or brief question
-    greeting_words = {"hi", "hello", "hey", "hiya", "howdy", "sup", "yo", "greetings"}
-    req_tokens = re.sub(r"[^\w\s]", "", req_lower).split()
-    is_simple_greeting = (
-        len(req_tokens) <= 3 and any(w in greeting_words for w in req_tokens)
-    ) or req_lower in [
-        "how are you", "how are you doing", "who are you", "what can you do", "help"
-    ]
-    if is_simple_greeting:
-        return response_text.strip(), []
+    # 3. Fallback: Only create an artifact if explicitly asked by the user,
+    # or if the response exceeds 900+ words.
+    # Simple responses and conversational questions NEVER generate artifacts.
+    should_create_artifact = (is_asked and total_words >= 30) or is_over_900
 
-    is_summarize = any(kw in req_lower for kw in [
-        "summariz", "summary", "summarise", "brief", "digest", "overview",
-        "recap", "takeaway", "takeaways", "key points", "tl;dr", "tldr", "synopsis"
-    ])
-    is_essay = any(kw in req_lower for kw in [
-        "essay", "article", "draft", "create a document", "write a post",
-        "guide", "checklist", "playbook", "framework", "roadmap",
-        "1,250", "1250", "write up", "write-up", "create an artifact", "generate an artifact"
-    ])
-    is_writing_intent = is_summarize or is_essay
-
-    clean_resp = _clean_thinking(response_text)
-    lines = clean_resp.strip().splitlines()
-    has_top_heading = any(line.strip().startswith("#") for line in lines[:10])
-    has_list_items = any(re.match(r'^\s*[-*•\d+\.]', line) for line in lines)
-    words = clean_resp.split()
-    word_count = len(words)
-    char_count = len(clean_resp)
-    # Goal threshold for large responses:
-    # Set response length as goal: When the response touches the goal length, create an artifact for it!
-    # A response is considered large when word_count >= 120 or char_count >= 600
-    RESPONSE_LENGTH_GOAL_WORDS = 120
-    RESPONSE_LENGTH_GOAL_CHARS = 600
-
-    is_large_response = (
-        word_count >= RESPONSE_LENGTH_GOAL_WORDS
-        or char_count >= RESPONSE_LENGTH_GOAL_CHARS
-        or (has_top_heading and word_count >= 60)
-    )
-
-    should_create_artifact = (
-        (is_writing_intent and word_count >= 25)
-        or is_large_response
-    )
-
-    if should_create_artifact and word_count >= 15:
+    if should_create_artifact:
+        clean_resp = _clean_thinking(response_text)
+        lines = clean_resp.strip().splitlines()
         title = _infer_artifact_title(clean_resp, user_request)
 
         artifact_type = "markdown"
@@ -336,8 +350,6 @@ def extract_artifacts(response_text: str, user_request: Optional[str] = None) ->
             "content": clean_resp.strip()
         })
 
-        # Do NOT write the entire artifact content in the chat conversation screen!
-        # Show concise common text in the conversation, and display the artifact in its dedicated panel.
         intro_lines = []
         for line in lines:
             if line.strip().startswith("#"):

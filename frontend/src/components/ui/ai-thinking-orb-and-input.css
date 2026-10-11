@@ -258,31 +258,10 @@
 }
 
 .mo-ring {
-  inset: -1px;
-  padding: 1px;
-  background: conic-gradient(
-    from var(--angle),
-    rgba(255, 255, 255, 0.06) 0deg,
-    rgba(255, 255, 255, 0.45) 60deg,
-    rgba(255, 255, 255, 0.06) 140deg,
-    rgba(255, 255, 255, 0.06) 220deg,
-    rgba(255, 255, 255, 0.35) 290deg,
-    rgba(255, 255, 255, 0.06) 360deg
-  );
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  opacity: var(--oRing);
-  animation: mo-spin 6s linear infinite;
-  pointer-events: none;
+  display: none;
 }
-.mo-actor[data-typing] .mo-ring {
-  animation-duration: 1.6s;
-}
-.mo-actor[data-flash] .mo-ring {
-  background: oklch(0.63 0.22 25);
+.mo-actor[data-flash] .mo-surface {
+  border-color: oklch(0.63 0.22 25);
 }
 
 /* ── input ── */
@@ -664,33 +643,11 @@
 }
 
 .mo-composer-ring {
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  padding: 1px;
-  background: conic-gradient(
-    from var(--angle, 0deg),
-    rgba(255, 255, 255, 0.06) 0deg,
-    rgba(255, 255, 255, 0.4) 60deg,
-    rgba(255, 255, 255, 0.06) 140deg,
-    rgba(255, 255, 255, 0.06) 220deg,
-    rgba(255, 255, 255, 0.3) 290deg,
-    rgba(255, 255, 255, 0.06) 360deg
-  );
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  animation: mo-spin 6s linear infinite;
-  pointer-events: none;
-  z-index: 2;
+  display: none;
 }
-.mo-composer-box[data-typing] .mo-composer-ring {
-  animation-duration: 1.6s;
-}
-.mo-composer-box:focus-within .mo-composer-ring {
-  box-shadow: 0 0 12px rgba(255, 255, 255, 0.12);
+.mo-composer-box:focus-within .mo-composer-surface,
+.mo-actor:focus-within .mo-surface {
+  border-color: oklch(0.36 0 0);
 }
 
 .mo-composer-row {
