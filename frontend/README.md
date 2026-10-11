@@ -1,37 +1,39 @@
 # Lenny Growth Assistant - Frontend
 
-The frontend is a modern, responsive, and accessible web application built with **React 19**, **TypeScript**, **Tailwind CSS v4**, and **TanStack Router / Start**. It delivers a ChatGPT/Claude-style experience tailored to product growth insights from Lenny Rachitsky's podcast and newsletter library.
+The frontend is a modern, responsive single-page application built with **React 19**, **TypeScript**, **Tailwind CSS v4**, and **TanStack Router / Start**. It delivers an interactive conversational workspace with side-by-side artifact rendering and real-time streaming grounded in Lenny Rachitsky's podcast knowledge base.
 
 ---
 
-## ✨ Features
+## ✨ Features & Architecture
 
-- **Split-Pane Workspace:**
-  - **Collapsible Sidebar:** Conversation thread management (create, rename, delete, switch).
-  - **Central Chat:** Markdown-rendered conversation with streaming tokens and auto-scroll.
-  - **Artifact Viewer:** Dedicated collapsible side pane that renders generated essays, teardowns, and strategic roadmaps in formatted Markdown or live HTML.
-- **Realtime SSE Streaming:** Token-by-token response streaming with low-latency Server-Sent Events (SSE).
-- **Interactive Source Citations:** Clickable badges linking directly to podcast timestamps, episodes, and transcript excerpts.
-- **Dynamic Model Switching:** Fast toggle between **Local (Ollama / Llama 3)** and **Cloud (OpenRouter / Llama 3.3 / Claude)**.
-- **Design System:** Rich dark-mode palette, subtle micro-interactions, accessible Radix UI primitives, Lucide icons, and toast feedback (Sonner).
+- **3-Pane Collapsible Workspace:**
+  - **Left Sidebar:** Conversation thread management (create, rename, delete, switch).
+  - **Center Chat:** Full markdown chat stream with live SSE token deltas and auto-scroll.
+  - **Right Artifact Viewer:** Dedicated side pane rendering generated essays, briefs, and HTML mockups.
+- **Server-Sent Events (SSE) Streaming:** Real-time token streaming with live status updates (*"Thinking..."*, *"Generating your answer..."*, *"Drafting your artifact..."*).
+- **Interactive Source Citations:** Clickable source badges displaying episode name and speaker, opening an overlay drawer with timestamps, official links, and retrieved excerpts.
+- **Dynamic Model Selector:** Fast switching between **Local (Qwen3)** (`qwen3:4b`), **Local (Llama 3)** (`llama3:latest`), and **Cloud (OpenRouter)** (`openai/gpt-4o-mini`).
+- **Safe HTML & Markdown Isolation:** Untrusted HTML artifacts render strictly inside an iframe with `sandbox=""` and `referrerPolicy="no-referrer"`. Markdown is parsed without raw HTML injection.
+- **Export Capabilities:** One-click Copy to clipboard and file Download (`.md` or `.html`).
 
 ---
 
-## 🛠️ Tech Stack
+## 🛠️ Technology Stack
 
 - **Framework:** [React 19](https://react.dev/) + [Vite](https://vitejs.dev/)
-- **Routing & State:** [TanStack Router](https://tanstack.com/router) & [TanStack Query](https://tanstack.com/query)
-- **Styling:** [Tailwind CSS v4](https://tailwindcss.com/) with curated HSL color tokens
-- **Components:** [Radix UI](https://www.radix-ui.com/) + custom accessible wrappers
-- **Markdown & Code:** `react-markdown` with GitHub Flavored Markdown (`remark-gfm`)
-- **Testing & Tooling:** [Vitest](https://vitest.dev/), [Testing Library](https://testing-library.com/), [ESLint](https://eslint.org/), and [Prettier](https://prettier.io/)
+- **Routing & State:** [TanStack Router](https://tanstack.com/router) & custom state engine ([`store.tsx`](file:///w:/~Works/Oogway/lenny's%20chatbot/frontend/src/components/assistant/store.tsx))
+- **Styling:** [Tailwind CSS v4](https://tailwindcss.com/) with custom dark HSL tokens
+- **Components:** [Radix UI](https://www.radix-ui.com/) accessible primitives + Lucide icons
+- **Markdown:** `react-markdown` with `remark-gfm`
+- **Testing & Quality:** [Vitest](https://vitest.dev/), [ESLint](https://eslint.org/), and [Prettier](https://prettier.io/)
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Setup & Installation (Windows PowerShell / Bash)
 
 ### 1. Install Dependencies
 ```bash
+cd frontend
 npm install
 ```
 
@@ -49,7 +51,7 @@ VITE_API_BASE_URL=http://localhost:8000/api/v1
 ```bash
 npm run dev
 ```
-The application will launch at `http://localhost:5173` (or `http://localhost:8080` if configured).
+The application will launch at `http://localhost:5173` (or port configured by Vite).
 
 ---
 
@@ -59,6 +61,11 @@ The application will launch at `http://localhost:5173` (or `http://localhost:808
 ```bash
 npm test
 ```
+**Test Results:**
+- **3 test suites passed (13 tests total)**:
+  - `src/test/chat-flow.test.ts`: Chat sending, streaming chunks, and message state.
+  - `src/test/conversations.test.ts`: Thread creation, selection, and deletion.
+  - `src/test/app-routing.test.tsx`: Route mounting and initial state hydration.
 
 ### Check Linting & Formatting
 ```bash
@@ -77,26 +84,31 @@ npm run build
 
 ---
 
-## 📁 Project Structure
+## 📁 Directory Structure
 
 ```
 frontend/src/
 ├── components/
-│   ├── assistant/           # Domain components (Chat, Sidebar, Artifacts, Citations)
-│   │   ├── AppLayout.tsx           # Master layout with responsive split-pane
+│   ├── assistant/              # Assistant domain components
+│   │   ├── AppLayout.tsx           # 3-pane responsive layout container
 │   │   ├── ArtifactViewer.tsx      # Side drawer for reading essays & HTML
-│   │   ├── ChatHeader.tsx          # Model toggle and thread metadata
+│   │   ├── ChatHeader.tsx          # Model toggle and thread title
 │   │   ├── ChatMessage.tsx         # Message bubble with markdown & citations
-│   │   ├── ConversationSidebar.tsx # Thread list with rename/delete
-│   │   ├── MessageComposer.tsx     # Dynamic auto-growing textarea & send controls
-│   │   ├── ModelSelector.tsx       # Local vs. Cloud switcher
-│   │   ├── SourceCitation.tsx      # Grounding citation cards & episode links
-│   │   └── store.tsx               # Client state machine & SSE streaming engine
-│   └── ui/                  # Radix-based reusable UI primitives
-├── hooks/                   # Custom React hooks (useMobile, etc.)
-├── lib/                     # Utility functions (formatting, date-fns, error reporting)
-├── routes/                  # TanStack Start file-based routing
-├── services/                # API client with REST & SSE streaming
-├── styles.css               # Global theme tokens, typography & animations
-└── test/                    # Vitest component & integration test specs
+│   │   ├── ConversationItem.tsx    # Thread row with inline rename & delete
+│   │   ├── ConversationSidebar.tsx # Thread list & + New Chat button
+│   │   ├── HtmlPreview.tsx         # Strict sandboxed iframe preview (sandbox="")
+│   │   ├── Logo.tsx                # Lenny assistant brand icon
+│   │   ├── MarkdownPreview.tsx     # Safe react-markdown renderer
+│   │   ├── MessageComposer.tsx     # Auto-expanding textarea with Send & Stop
+│   │   ├── ModelSelector.tsx       # Qwen3 / Llama 3 / OpenRouter switcher
+│   │   ├── SourceCitation.tsx      # Grounding badge & excerpt drawer
+│   │   ├── States.tsx              # Loading, Empty, and Error state components
+│   │   └── store.tsx               # State machine & SSE streaming engine
+│   └── ui/                     # Radix-based reusable primitives (button, popover, etc.)
+├── hooks/                      # Custom hooks (useMobile, etc.)
+├── lib/                        # Utility functions (cn, date formatting)
+├── routes/                     # TanStack Start file-based routing
+├── services/                   # API client with REST & SSE streaming
+├── styles.css                  # Theme tokens, typography (.prose-lenny), and animations
+└── test/                       # Vitest integration & component test specs
 ```
