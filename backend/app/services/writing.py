@@ -30,7 +30,7 @@ If asked to write an essay:
 
 CONVERSATIONAL COMPANION:
 Provide a brief, helpful conversational introduction outside the artifact block explaining what you have created.
-Do NOT output the `<artifact>` block for simple questions or conversational chat responses; only use it when the user explicitly asks for a document, essay, guide, page, or artifact, or when the response exceeds 900+ words.
+Do NOT output the `<artifact>` block for simple questions or conversational chat responses; only use it when the user explicitly asks for a document, essay, guide, page, or artifact, or when the response exceeds 500+ words.
 """
 
 def create_artifact_handler(args: dict, sandbox) -> str:
@@ -220,7 +220,7 @@ def extract_artifacts(response_text: str, user_request: Optional[str] = None) ->
     """
     Parses the response text to find <artifact> blocks.
     Artifacts are generated ONLY when explicitly requested by the user
-    or when the response exceeds 900+ words.
+    or when the response exceeds 500+ words.
     Simple responses and conversational queries remain normal chat messages without artifacts.
     """
     if not response_text:
@@ -229,7 +229,7 @@ def extract_artifacts(response_text: str, user_request: Optional[str] = None) ->
     is_asked = is_artifact_requested(user_request)
     clean_resp_text = _clean_thinking(response_text)
     total_words = len(clean_resp_text.split())
-    is_over_900 = total_words >= 900
+    is_over_500 = total_words >= 500
 
     artifacts: List[Dict[str, str]] = []
     
@@ -243,9 +243,9 @@ def extract_artifacts(response_text: str, user_request: Optional[str] = None) ->
     open_matches = list(open_tag_pattern.finditer(response_text))
     
     if open_matches:
-        # If user provided a query, but did NOT ask for an artifact and response is under 900 words,
+        # If user provided a query, but did NOT ask for an artifact and response is under 500 words,
         # unwrap the tags so the content displays cleanly in chat as a simple response.
-        if user_request is not None and not is_asked and not is_over_900:
+        if user_request is not None and not is_asked and not is_over_500:
             unwrapped = re.sub(r'</?\s*artifact\b[^>]*>', '', response_text, flags=re.IGNORECASE).strip()
             return _clean_thinking(unwrapped), []
 
@@ -305,7 +305,7 @@ def extract_artifacts(response_text: str, user_request: Optional[str] = None) ->
     # 2. Check for malformed opening tag e.g. `<artifact ...` without `>`
     malformed_open = re.search(r'<artifact\b([^>\n]*)', response_text, re.IGNORECASE)
     if malformed_open:
-        if user_request is not None and not is_asked and not is_over_900:
+        if user_request is not None and not is_asked and not is_over_500:
             unwrapped = re.sub(r'<artifact\b[^>\n]*>?|</\s*artifact\s*>', '', response_text, flags=re.IGNORECASE).strip()
             return _clean_thinking(unwrapped), []
 
@@ -331,9 +331,9 @@ def extract_artifacts(response_text: str, user_request: Optional[str] = None) ->
             return cleaned_text, artifacts
 
     # 3. Fallback: Only create an artifact if explicitly asked by the user,
-    # or if the response exceeds 900+ words.
+    # or if the response exceeds 500+ words.
     # Simple responses and conversational questions NEVER generate artifacts.
-    should_create_artifact = (is_asked and total_words >= 30) or is_over_900
+    should_create_artifact = (is_asked and total_words >= 30) or is_over_500
 
     if should_create_artifact:
         clean_resp = _clean_thinking(response_text)

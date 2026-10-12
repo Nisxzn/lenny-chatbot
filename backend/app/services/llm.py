@@ -268,13 +268,10 @@ class PiFrameworkProvider(LLMProvider):
         if hasattr(self.pi_provider, "max_tokens"):
             self.pi_provider.max_tokens = target_max_tokens
 
-        # For local providers, do not bind writing_tool as native function calling.
-        # Instead, let the model generate XML markup directly as instructed by WRITING_SKILL_PROMPT.
-        # This ensures all generated text streams live to the UI in real time.
-        if self.supports_tools and self.provider_type != "local":
-            registry = ToolRegistry([writing_tool])
-        else:
-            registry = ToolRegistry([])
+        # Do not bind writing_tool as native function calling for any provider.
+        # Instead, let both local and cloud models generate XML markup directly as instructed by WRITING_SKILL_PROMPT.
+        # This ensures all generated text streams live to the UI and artifact content is preserved in response_text.
+        registry = ToolRegistry([])
         
         # Format conversation history
         neutral_messages = []
@@ -323,10 +320,10 @@ class PiFrameworkProvider(LLMProvider):
         if hasattr(self.pi_provider, "max_tokens"):
             self.pi_provider.max_tokens = target_max_tokens
         
-        if self.supports_tools and self.provider_type != "local":
-            registry = ToolRegistry([writing_tool])
-        else:
-            registry = ToolRegistry([])
+        # Do not bind writing_tool as native function calling for any provider.
+        # Instead, let both local and cloud models generate XML markup directly as instructed by WRITING_SKILL_PROMPT.
+        # This ensures all generated text streams live to the UI and artifact content is preserved in response_text.
+        registry = ToolRegistry([])
         
         neutral_messages = []
         history = messages[:-1]
