@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { MoreHorizontal, PencilLine, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
   DropdownMenu,
@@ -81,7 +81,7 @@ export function ConversationItem({
             aria-label={`Actions for ${conv.title}`}
             className="mr-1 size-7 shrink-0 rounded p-1 text-muted-foreground opacity-100 sm:opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
           >
-            <MoreHorizontal className="size-4" />
+            <MoreHorizontal className="size-4" strokeWidth={1.5} />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent
@@ -95,13 +95,13 @@ export function ConversationItem({
             }}
             className="text-[13px]"
           >
-            <Pencil className="size-3.5" /> Rename
+            <PencilLine className="size-3.5" strokeWidth={1.5} /> Rename
           </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={onDelete}
             className="text-[13px] text-destructive focus:bg-destructive/10 focus:text-destructive"
           >
-            <Trash2 className="size-3.5" /> Delete
+            <Trash2 className="size-3.5" strokeWidth={1.5} /> Delete
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

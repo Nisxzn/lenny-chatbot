@@ -1348,8 +1348,8 @@ export default function MorphOrb(props: MorphOrbProps) {
               strokeLinejoin="round"
               aria-hidden="true"
             >
-              <path d="M10 3.5l1.7 4.8 4.8 1.7-4.8 1.7L10 16.5l-1.7-4.8L3.5 10l4.8-1.7L10 3.5z" />
-              <path d="M18 14.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7.7-1.8z" />
+              <path d="M9.5 4.5C9.5 8.92 6.42 12 2 12C6.42 12 9.5 15.08 9.5 19.5C9.5 15.08 12.58 12 17 12C12.58 12 9.5 8.92 9.5 4.5Z" />
+              <path d="M18 3.5C18 5.43 16.43 7 14.5 7C16.43 7 18 8.57 18 10.5C18 8.57 19.57 7 21.5 7C19.57 7 18 5.43 18 3.5Z" />
             </svg>
             <input
               ref={inputRef}
@@ -1375,13 +1375,13 @@ export default function MorphOrb(props: MorphOrbProps) {
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth="1.5"
+                  strokeWidth="1.75"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   aria-hidden="true"
                 >
-                  <path d="M12 19V5" />
-                  <path d="M5.5 11.5L12 5l6.5 6.5" />
+                  <path d="M12 18.5V5.5" />
+                  <path d="m5.5 12 6.5-6.5 6.5 6.5" />
                 </svg>
               </button>
             </div>

@@ -47,12 +47,12 @@ export function ModelSelector({
             title={`Active model: ${fullLabel}. Click to switch.`}
           >
             {model.provider === "ollama" ? (
-              <Cpu className="size-3.5 shrink-0 text-muted-foreground" />
+              <Cpu className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
             ) : (
-              <Cloud className="size-3.5 shrink-0 text-muted-foreground" />
+              <Cloud className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
             )}
             <span className="max-w-[110px] truncate leading-none">{label}</span>
-            <ChevronDown className="size-3 shrink-0 opacity-60" />
+            <ChevronDown className="size-3 shrink-0 opacity-60" strokeWidth={1.5} />
           </button>
         ) : (
           <Button
@@ -65,12 +65,12 @@ export function ModelSelector({
             aria-label={`Selected provider: ${fullLabel}`}
           >
             {model.provider === "ollama" ? (
-              <Cpu className="size-3.5 text-muted-foreground" />
+              <Cpu className="size-3.5 text-muted-foreground" strokeWidth={1.5} />
             ) : (
-              <Cloud className="size-3.5 text-muted-foreground" />
+              <Cloud className="size-3.5 text-muted-foreground" strokeWidth={1.5} />
             )}
             <span className="max-w-[100px] truncate sm:max-w-[180px]">{fullLabel}</span>
-            <ChevronDown className="size-3.5 text-muted-foreground" />
+            <ChevronDown className="size-3.5 text-muted-foreground" strokeWidth={1.5} />
           </Button>
         )}
       </PopoverTrigger>
@@ -99,10 +99,10 @@ export function ModelSelector({
             )}
           >
             <span className="flex items-center gap-2">
-              <Cpu className="size-3.5 text-muted-foreground" /> Local (Llama 3 - Fast)
+              <Cpu className="size-3.5 text-muted-foreground" strokeWidth={1.5} /> Local (Llama 3 - Fast)
             </span>
             {model.provider === "ollama" && model.model === "llama3:latest" && (
-              <Check className="size-3.5 text-foreground" />
+              <Check className="size-3.5 text-foreground" strokeWidth={1.5} />
             )}
           </Button>
           <Button
@@ -119,10 +119,10 @@ export function ModelSelector({
             )}
           >
             <span className="flex items-center gap-2">
-              <Cpu className="size-3.5 text-muted-foreground" /> Local (Qwen3 - Reasoning)
+              <Cpu className="size-3.5 text-muted-foreground" strokeWidth={1.5} /> Local (Qwen3 - Reasoning)
             </span>
             {model.provider === "ollama" && model.model === "qwen3:4b" && (
-              <Check className="size-3.5 text-foreground" />
+              <Check className="size-3.5 text-foreground" strokeWidth={1.5} />
             )}
           </Button>
           <Button
@@ -141,9 +141,9 @@ export function ModelSelector({
             )}
           >
             <span className="flex items-center gap-2">
-              <Cloud className="size-3.5 text-muted-foreground" /> Cloud (OpenRouter)
+              <Cloud className="size-3.5 text-muted-foreground" strokeWidth={1.5} /> Cloud (OpenRouter)
             </span>
-            {model.provider === "cloud" && <Check className="size-3.5 text-foreground" />}
+            {model.provider === "cloud" && <Check className="size-3.5 text-foreground" strokeWidth={1.5} />}
           </Button>
         </div>
       </PopoverContent>

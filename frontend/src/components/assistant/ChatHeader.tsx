@@ -26,7 +26,7 @@ export function ChatHeader({
           title="Open conversations"
           className="size-8 shrink-0 text-muted-foreground hover:text-foreground md:hidden"
         >
-          <Menu className="size-4" />
+          <Menu className="size-4" strokeWidth={1.5} />
         </Button>
         <LogoMark className="size-6 shrink-0 md:hidden" />
         <div className="min-w-0">
@@ -54,7 +54,7 @@ export function ChatHeader({
             title="Open artifact viewer"
             className="h-8.5 gap-1.5 border border-border bg-card/60 px-3 text-[13px] font-medium text-foreground hover:bg-card hover:border-border/90"
           >
-            <PanelRightOpen className="size-3.5" />
+            <PanelRightOpen className="size-3.5" strokeWidth={1.5} />
             <span>View Artifact</span>
           </Button>
         )}
@@ -67,7 +67,7 @@ export function ChatHeader({
             title="Close artifact viewer"
             className="h-8.5 gap-1.5 px-3 text-[13px] text-muted-foreground hover:bg-accent hover:text-foreground"
           >
-            <PanelRightClose className="size-3.5" />
+            <PanelRightClose className="size-3.5" strokeWidth={1.5} />
             <span className="hidden sm:inline">Close Artifact</span>
           </Button>
         )}

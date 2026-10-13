@@ -120,6 +120,14 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
+
+  /* Premium Minimal Vector Icon System */
+  svg.lucide,
+  .lucide {
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
 }
 
 @utility prose-lenny {

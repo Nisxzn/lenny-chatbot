@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { MessageSquarePlus, MessagesSquare, PanelLeft, Search, SearchX } from "lucide-react";
+import { MessageSquare, PanelLeft, Search, SearchX, SquarePen } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   AlertDialog,
@@ -48,7 +48,7 @@ export function ConversationSidebar({
             title="Expand sidebar"
             className="size-8 text-muted-foreground hover:text-foreground hover:bg-white/[0.06]"
           >
-            <PanelLeft className="size-4" />
+            <PanelLeft className="size-4" strokeWidth={1.5} />
           </Button>
         )}
         <LogoMark className="size-8" />
@@ -57,9 +57,9 @@ export function ConversationSidebar({
           onClick={newChat}
           title="New chat"
           aria-label="New chat"
-          className="flex size-9 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.03] text-muted-foreground/80 transition-colors hover:border-white/[0.14] hover:bg-white/[0.07] hover:text-foreground focus-visible:outline-none"
+          className="flex size-9 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.03] text-muted-foreground/80 transition-all duration-150 hover:border-white/[0.14] hover:bg-white/[0.07] hover:text-foreground focus-visible:outline-none"
         >
-          <MessageSquarePlus className="size-4" />
+          <SquarePen className="size-4" strokeWidth={1.5} />
         </button>
       </aside>
     );
@@ -86,7 +86,7 @@ export function ConversationSidebar({
             title="Collapse sidebar"
             className="size-8 shrink-0 text-muted-foreground hover:text-foreground hover:bg-white/[0.06]"
           >
-            <PanelLeft className="size-4" />
+            <PanelLeft className="size-4" strokeWidth={1.5} />
           </Button>
         )}
       </div>
@@ -97,13 +97,13 @@ export function ConversationSidebar({
             newChat();
             onNavigate?.();
           }}
-          className="flex h-10 w-full items-center gap-2.5 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 text-[13.5px] font-medium text-foreground/90 transition-all duration-150 hover:border-white/[0.14] hover:bg-white/[0.07] hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring select-none"
+          className="group flex h-10 w-full items-center gap-2.5 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 text-[13.5px] font-medium text-foreground/90 transition-all duration-150 hover:border-white/[0.14] hover:bg-white/[0.07] hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring select-none"
         >
-          <MessageSquarePlus className="size-4 text-muted-foreground/80" />
+          <SquarePen className="size-4 text-muted-foreground/80 transition-colors group-hover:text-foreground" strokeWidth={1.5} />
           <span>New chat</span>
         </button>
         <div className="relative">
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground/50" />
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground/50" strokeWidth={1.5} />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -120,7 +120,7 @@ export function ConversationSidebar({
         {hydrated && conversations.length === 0 && (
           <div className="flex flex-col items-center justify-center px-4 py-16 text-center select-none">
             <div className="mb-2.5 flex size-8 items-center justify-center rounded-full bg-white/[0.03] text-muted-foreground/40">
-              <MessagesSquare className="size-3.5" />
+              <MessageSquare className="size-3.5" strokeWidth={1.5} />
             </div>
             <p className="text-[13px] font-medium text-foreground/75">No conversations yet</p>
             <p className="mt-1 max-w-[175px] text-[11.5px] leading-relaxed text-muted-foreground/50">
@@ -131,7 +131,7 @@ export function ConversationSidebar({
         {conversations.length > 0 && groups.length === 0 && (
           <div className="flex flex-col items-center justify-center px-4 py-12 text-center select-none">
             <div className="mb-2 flex size-7 items-center justify-center rounded-full bg-white/[0.03] text-muted-foreground/40">
-              <SearchX className="size-3.5" />
+              <SearchX className="size-3.5" strokeWidth={1.5} />
             </div>
             <p className="text-[13px] font-medium text-foreground/70">No matches found</p>
           </div>

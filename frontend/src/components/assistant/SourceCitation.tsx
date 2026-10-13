@@ -1,4 +1,4 @@
-import { ExternalLink, Headphones } from "lucide-react";
+import { ArrowUpRight, AudioLines } from "lucide-react";
 import type { Source } from "@/types/assistant";
 
 /**
@@ -64,7 +64,7 @@ export function SourceCitation({ sources }: { sources: Source[] }) {
   return (
     <div className="mt-6 border-t border-border/60 pt-4">
       <div className="mb-3.5 flex items-center gap-2">
-        <Headphones className="size-4 text-muted-foreground" />
+        <AudioLines className="size-3.5 text-muted-foreground" strokeWidth={1.5} />
         <span className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
           Sources ({validSources.length})
         </span>
@@ -94,7 +94,10 @@ export function SourceCitation({ sources }: { sources: Source[] }) {
                       className="inline-flex items-center gap-1.5 font-medium text-foreground underline-offset-4 transition-colors hover:underline"
                     >
                       <span>{displayTitle}</span>
-                      <ExternalLink className="size-3.5 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground" />
+                      <ArrowUpRight
+                        className="size-3.5 shrink-0 text-muted-foreground transition-all duration-150 group-hover:text-foreground group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                        strokeWidth={1.5}
+                      />
                     </a>
                   ) : (
                     <span>{displayTitle}</span>

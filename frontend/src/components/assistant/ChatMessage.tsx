@@ -96,9 +96,9 @@ function ThinkingBlock({ thinking, isGenerating }: { thinking: string; isGenerat
         aria-expanded={isOpen}
       >
         {isGenerating ? (
-          <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
+          <Loader2 className="size-3.5 animate-spin text-muted-foreground" strokeWidth={1.5} />
         ) : (
-          <Sparkles className="size-3.5 text-muted-foreground transition-transform duration-150 group-hover:scale-105" />
+          <Sparkles className="size-3.5 text-muted-foreground transition-transform duration-150 group-hover:scale-105" strokeWidth={1.5} />
         )}
         <span>{label}</span>
         <ChevronDown
@@ -106,6 +106,7 @@ function ThinkingBlock({ thinking, isGenerating }: { thinking: string; isGenerat
             "size-3 text-muted-foreground transition-transform duration-150",
             isOpen && "rotate-180",
           )}
+          strokeWidth={1.5}
         />
       </button>
 
@@ -169,7 +170,7 @@ export function ChatMessage({ message }: { message: Message }) {
         {/* Active status indicator (shown only when generating and no thinking block present) */}
         {!done && message.statusMsg && !thinking && (
           <div className="mb-3.5 inline-flex items-center gap-2 rounded-full border border-border bg-card/80 px-3.5 py-1 text-[12.5px] font-medium text-muted-foreground shadow-2xs">
-            <Loader2 className="size-3.5 animate-spin text-foreground" />
+            <Loader2 className="size-3.5 animate-spin text-foreground" strokeWidth={1.5} />
             <span>{message.statusMsg}</span>
           </div>
         )}
@@ -189,9 +190,9 @@ export function ChatMessage({ message }: { message: Message }) {
           >
             <span className="flex size-10 items-center justify-center rounded-lg border border-border/60 bg-muted/60 text-foreground">
               {artifact.type === "html" ? (
-                <Code2 className="size-4.5" />
+                <Code2 className="size-4.5" strokeWidth={1.5} />
               ) : (
-                <FileText className="size-4.5" />
+                <FileText className="size-4.5" strokeWidth={1.5} />
               )}
             </span>
             <span className="min-w-0 flex-1">
@@ -203,7 +204,7 @@ export function ChatMessage({ message }: { message: Message }) {
               </span>
             </span>
             <span className="flex items-center gap-1.5 text-xs sm:text-[13px] font-medium text-muted-foreground transition-colors group-hover:text-foreground">
-              View <PanelRightOpen className="size-4" />
+              View <PanelRightOpen className="size-4 transition-transform group-hover:translate-x-0.5" strokeWidth={1.5} />
             </span>
           </Button>
         )}

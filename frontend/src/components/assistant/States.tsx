@@ -1,4 +1,4 @@
-import { AlertTriangle, RotateCcw } from "lucide-react";
+import { AlertCircle, RotateCcw } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 
@@ -47,7 +47,7 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
       role="alert"
       className="flex items-start gap-3 rounded-xl border border-destructive/35 bg-destructive/10 p-3.5 text-sm shadow-xs animate-in fade-in-50 duration-200"
     >
-      <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" />
+      <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive" strokeWidth={1.5} />
       <div className="flex-1">
         <p className="font-medium text-foreground">Response failed</p>
         <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{message}</p>
@@ -59,7 +59,7 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
           onClick={onRetry}
           className="h-8 gap-1.5 border-destructive/30 text-xs hover:border-destructive/60 hover:bg-destructive/10"
         >
-          <RotateCcw className="size-3" /> Retry
+          <RotateCcw className="size-3" strokeWidth={1.5} /> Retry
         </Button>
       )}
     </div>

@@ -1,4 +1,4 @@
-import { ArrowUpRight, ChartNoAxesCombined, Layers3, Sprout, Target } from "lucide-react";
+import { ArrowUpRight, CircleDollarSign, Compass, Sparkles, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEffect, useRef, useState } from "react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -20,7 +20,7 @@ function Welcome() {
     const hour = new Date().getHours();
     setGreeting(hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening");
   }, []);
-  const icons = [Target, ChartNoAxesCombined, Sprout, Layers3];
+  const icons = [Compass, TrendingUp, Sparkles, CircleDollarSign];
   const topics = ["Product-market fit", "Retention", "Onboarding", "Pricing"];
   return (
     <div className="mx-auto flex w-full max-w-[800px] flex-col px-5 pt-12 pb-8 sm:px-8 sm:pt-20">
@@ -34,7 +34,7 @@ function Welcome() {
       </p>
       <div className="mt-8 grid w-full gap-2.5 sm:grid-cols-2">
         {STARTER_QUESTIONS.slice(0, 4).map((q, i) => {
-          const Icon = icons[i] ?? Target;
+          const Icon = icons[i] ?? Compass;
           return (
             <Button
               key={q}
@@ -43,9 +43,15 @@ function Welcome() {
               className="group h-auto min-h-24 flex-col items-start gap-2.5 whitespace-normal rounded-xl border border-border bg-card/50 p-4 text-left shadow-2xs transition-colors hover:border-border hover:bg-card"
             >
               <span className="flex w-full items-center gap-2 text-[12.5px] text-muted-foreground">
-                <Icon className="size-3.5 text-muted-foreground transition-colors group-hover:text-foreground" />
+                <Icon
+                  className="size-3.5 text-muted-foreground transition-colors group-hover:text-foreground"
+                  strokeWidth={1.5}
+                />
                 <span>{topics[i]}</span>
-                <ArrowUpRight className="ml-auto size-3 opacity-0 transition-opacity group-hover:opacity-100" />
+                <ArrowUpRight
+                  className="ml-auto size-3 opacity-0 transition-all duration-150 group-hover:opacity-100 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                  strokeWidth={1.5}
+                />
               </span>
               <span className="text-[13.5px] font-normal leading-relaxed text-foreground/90">
                 {q}

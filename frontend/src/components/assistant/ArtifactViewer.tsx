@@ -16,7 +16,7 @@ export function ArtifactViewer({ className }: { className?: string }) {
   if (!artifact) {
     return (
       <section className={cn("flex flex-col bg-background", className)}>
-        <EmptyState icon={<FileText className="size-6" />} title="No artifact selected">
+        <EmptyState icon={<FileText className="size-6" strokeWidth={1.5} />} title="No artifact selected">
           Documents and pages the assistant creates appear here.
         </EmptyState>
       </section>
@@ -57,9 +57,9 @@ export function ArtifactViewer({ className }: { className?: string }) {
         <div className="flex min-w-0 items-center gap-2.5">
           <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted/60 text-foreground">
             {artifact.type === "html" ? (
-              <Code2 className="size-3.5" />
+              <Code2 className="size-3.5" strokeWidth={1.5} />
             ) : (
-              <FileText className="size-3.5" />
+              <FileText className="size-3.5" strokeWidth={1.5} />
             )}
           </span>
           <div className="min-w-0">
@@ -79,7 +79,7 @@ export function ArtifactViewer({ className }: { className?: string }) {
           title="Close artifact viewer"
           className={iconBtn}
         >
-          <X className="size-4" />
+          <X className="size-4" strokeWidth={1.5} />
         </Button>
       </header>
 
@@ -87,7 +87,7 @@ export function ArtifactViewer({ className }: { className?: string }) {
       {artifacts.length > 1 && (
         <div className="flex items-center gap-2 overflow-x-auto border-b border-border bg-sidebar/80 px-4 py-1.5 text-xs scrollbar-thin">
           <span className="flex shrink-0 items-center gap-1 font-mono text-[11px] text-muted-foreground">
-            <Layers className="size-3.5" /> Artifacts ({artifacts.length}):
+            <Layers className="size-3.5" strokeWidth={1.5} /> Artifacts ({artifacts.length}):
           </span>
           <div className="flex gap-1">
             {artifacts.map((a) => (
@@ -133,7 +133,11 @@ export function ArtifactViewer({ className }: { className?: string }) {
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
-              {t === "preview" ? <Eye className="size-3.5" /> : <Code2 className="size-3.5" />}
+              {t === "preview" ? (
+                <Eye className="size-3.5" strokeWidth={1.5} />
+              ) : (
+                <Code2 className="size-3.5" strokeWidth={1.5} />
+              )}
               {t}
             </Button>
           ))}
@@ -148,9 +152,9 @@ export function ArtifactViewer({ className }: { className?: string }) {
             className={iconBtn}
           >
             {copied ? (
-              <Check className="size-3.5 text-foreground" />
+              <Check className="size-3.5 text-foreground" strokeWidth={1.5} />
             ) : (
-              <Copy className="size-3.5" />
+              <Copy className="size-3.5" strokeWidth={1.5} />
             )}
           </Button>
           <Button
@@ -161,7 +165,7 @@ export function ArtifactViewer({ className }: { className?: string }) {
             title="Download artifact"
             className={iconBtn}
           >
-            <Download className="size-3.5" />
+            <Download className="size-3.5" strokeWidth={1.5} />
           </Button>
         </div>
       </div>
@@ -171,7 +175,7 @@ export function ArtifactViewer({ className }: { className?: string }) {
         className="min-h-0 flex-1 overflow-auto overscroll-contain p-4 sm:p-5 scrollbar-thin"
       >
         {!artifact.content ? (
-          <EmptyState icon={<FileText className="size-6" />} title="No content">
+          <EmptyState icon={<FileText className="size-6" strokeWidth={1.5} />} title="No content">
             This artifact does not contain any content.
           </EmptyState>
         ) : tab === "source" ? (
