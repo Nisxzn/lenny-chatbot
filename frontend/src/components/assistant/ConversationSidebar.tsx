@@ -107,8 +107,8 @@ export function ConversationSidebar({
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search conversations…"
-            aria-label="Search conversations"
+            placeholder="Find…"
+            aria-label="Find"
             className="h-9.5 w-full rounded-lg border border-white/[0.05] bg-white/[0.02] pr-2.5 pl-8.5 text-[13px] text-foreground placeholder:text-muted-foreground/45 transition-colors focus:border-white/[0.15] focus:bg-white/[0.04] focus:outline-none focus:ring-0"
           />
         </div>
